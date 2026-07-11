@@ -1,0 +1,21 @@
+﻿name: 华夏：文明崛起
+description: 一款以华夏五千年历史为背景的文明模拟游戏，灵感来源于矮人要塞
+labels:
+  - game
+  - html5
+  - canvas
+  - civilization
+  - simulation
+  - chinese-history
+  - pixel-art
+  - single-file
+
+topics:
+  - html5-game
+  - canvas-game
+  - civilization-building
+  - simulation-game
+  - chinese-history
+  - dwarf-fortress-like
+  - single-page-app
+  - vanilla-javascript

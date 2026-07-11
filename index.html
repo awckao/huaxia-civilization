@@ -1,0 +1,3834 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>华夏：文明崛起 · 势力与科技版</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0c10;
+    color: #e8e6e3;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    user-select: none;
+  }
+  #game-container { display: flex; height: 100vh; position: relative; }
+  #canvas-wrap { flex: 1; position: relative; background: linear-gradient(180deg, #152030 0%, #0a1018 100%); }
+  canvas { display: block; cursor: crosshair; }
+
+  /* 顶部状态栏 */
+  #topbar {
+    position: absolute; top: 0; left: 0; right: 0;
+    background: linear-gradient(180deg, rgba(12,16,24,0.97) 0%, rgba(12,16,24,0.8) 100%);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(74,158,255,0.2);
+    padding: 8px 16px;
+    display: flex; gap: 10px; align-items: center;
+    z-index: 100; flex-wrap: wrap;
+  }
+  .chapter-badge {
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+    color: white; padding: 5px 14px; border-radius: 16px;
+    font-weight: 600; font-size: 12px; letter-spacing: 0.05em;
+    box-shadow: 0 2px 10px rgba(243,156,18,0.3);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .chapter-badge::before {
+    content: ''; width: 6px; height: 6px; background: #fff; border-radius: 50%;
+    box-shadow: 0 0 6px #fff; animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+  .resource {
+    display: flex; align-items: center; gap: 5px;
+    background: rgba(30,40,55,0.7); padding: 4px 10px;
+    border-radius: 8px; border: 1px solid rgba(74,158,255,0.12);
+    font-size: 12px; transition: all .2s;
+  }
+  .resource:hover { background: rgba(45,60,85,0.8); }
+  .resource .icon { font-size: 15px; }
+  .resource .val { color: #6ab7ff; font-weight: 600; min-width: 22px; text-align: right; }
+  .resource .label { color: #7a8aa5; font-size: 10px; }
+
+  /* 速度控制 */
+  #speed-controls {
+    position: absolute; top: 54px; right: 16px;
+    display: flex; gap: 2px; z-index: 100;
+    background: rgba(12,16,24,0.9); backdrop-filter: blur(10px);
+    padding: 3px; border-radius: 10px;
+    border: 1px solid rgba(74,158,255,0.15);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .speed-btn {
+    width: 34px; height: 30px;
+    background: rgba(30,40,55,0.6); border: 1px solid transparent;
+    color: #7a8aa5; cursor: pointer; border-radius: 6px;
+    font-size: 12px; transition: all .15s;
+  }
+  .speed-btn:hover { background: rgba(45,60,85,0.8); color: #e8e6e3; }
+  .speed-btn.active {
+    background: linear-gradient(180deg, #4a9eff, #2d7dd2);
+    color: white; font-weight: 600;
+    box-shadow: 0 2px 8px rgba(74,158,255,0.4);
+  }
+
+  /* 左侧任务栏 */
+  #left-panel {
+    position: absolute; top: 54px; left: 12px;
+    width: 250px; z-index: 90;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .panel {
+    background: rgba(12,16,24,0.92); backdrop-filter: blur(10px);
+    border: 1px solid rgba(74,158,255,0.15);
+    border-radius: 12px; padding: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  }
+  .panel-title {
+    font-size: 12px; color: #6ab7ff; font-weight: 600;
+    margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+    padding-bottom: 6px; border-bottom: 1px solid rgba(74,158,255,0.1);
+  }
+  .main-quest {
+    background: linear-gradient(90deg, rgba(74,158,255,0.12), transparent);
+    border-left: 3px solid #4a9eff;
+    padding: 8px 10px; margin-bottom: 4px;
+    border-radius: 0 8px 8px 0; cursor: pointer; transition: all .2s;
+  }
+  .main-quest:hover { background: linear-gradient(90deg, rgba(74,158,255,0.2), transparent); }
+  .main-quest .q-name { font-size: 12px; font-weight: 600; color: #e8e6e3; }
+  .main-quest .q-desc { font-size: 11px; color: #7a8aa5; margin-top: 2px; line-height: 1.4; }
+  .main-quest .q-progress {
+    height: 4px; background: rgba(30,40,55,0.8);
+    border-radius: 2px; margin-top: 6px; overflow: hidden;
+  }
+  .main-quest .q-progress-fill {
+    height: 100%; background: linear-gradient(90deg, #2d7dd2, #4a9eff);
+    border-radius: 2px; transition: width .4s cubic-bezier(.4,0,.2,1);
+    box-shadow: 0 0 8px rgba(74,158,255,0.5);
+  }
+  .side-quest {
+    padding: 4px 8px; margin-bottom: 2px; font-size: 11px;
+    color: #7a8aa5; cursor: pointer; border-radius: 6px;
+    display: flex; justify-content: space-between; align-items: center;
+    transition: all .15s;
+  }
+  .side-quest:hover { background: rgba(74,158,255,0.08); color: #e8e6e3; }
+  .side-quest.completed { color: #27ae60; text-decoration: line-through; }
+  .side-quest .q-prog {
+    font-size: 10px; color: #6ab7ff;
+    background: rgba(74,158,255,0.1);
+    padding: 1px 6px; border-radius: 8px;
+  }
+  .side-quest.completed .q-prog { color: #27ae60; background: rgba(39,174,96,0.15); }
+
+  /* 势力面板 */
+  #influence-bar {
+    height: 6px; background: rgba(30,40,55,0.8);
+    border-radius: 3px; overflow: hidden; margin-top: 6px;
+  }
+  #influence-fill {
+    height: 100%; background: linear-gradient(90deg, #f39c12, #e74c3c);
+    border-radius: 3px; transition: width .5s;
+    box-shadow: 0 0 6px rgba(243,156,18,0.5);
+  }
+  .influence-stat {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: #7a8aa5; margin-top: 4px;
+  }
+  .influence-stat span { color: #f39c12; font-weight: 600; }
+
+  /* 右侧面板 */
+  #sidebar {
+    width: 300px;
+    background: linear-gradient(180deg, #0e1218 0%, #0a0c10 100%);
+    border-left: 1px solid rgba(74,158,255,0.1);
+    padding: 10px; overflow-y: auto; font-size: 13px;
+  }
+  .tab-bar {
+    display: flex; gap: 2px; margin-bottom: 10px;
+    background: rgba(20,28,40,0.6); padding: 3px;
+    border-radius: 10px; flex-wrap: wrap;
+  }
+  .tab {
+    flex: 1; padding: 7px 3px; color: #7a8aa5;
+    cursor: pointer; text-align: center;
+    font-size: 10px; border-radius: 7px;
+    transition: all .2s; font-weight: 500;
+    min-width: 40px;
+  }
+  .tab:hover { color: #e8e6e3; }
+  .tab.active {
+    background: linear-gradient(180deg, #2a3a55, #1e2a40);
+    color: #6ab7ff; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; animation: fadeIn .2s; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+
+  h3 {
+    color: #6ab7ff; font-size: 12px;
+    margin: 12px 0 6px; padding-bottom: 5px;
+    border-bottom: 1px solid rgba(74,158,255,0.1);
+    display: flex; align-items: center; gap: 6px;
+    font-weight: 600;
+  }
+
+  /* 建造网格 */
+  .build-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .build-item {
+    padding: 8px 3px; background: rgba(30,40,55,0.6);
+    border: 1px solid rgba(74,158,255,0.12);
+    color: #e8e6e3; cursor: pointer; text-align: center;
+    font-size: 10px; border-radius: 8px; transition: all .2s;
+  }
+  .build-item:hover {
+    border-color: rgba(74,158,255,0.4);
+    background: rgba(40,55,80,0.7); transform: translateY(-1px);
+  }
+  .build-item.selected {
+    border-color: #4a9eff; background: rgba(74,158,255,0.15);
+    color: #6ab7ff; font-weight: 600;
+    box-shadow: 0 0 10px rgba(74,158,255,0.2);
+  }
+  .build-item.locked { opacity: 0.4; cursor: not-allowed; filter: grayscale(.6); }
+  .build-item.researched { border-color: rgba(46,204,113,0.3); }
+  .build-item .icon { font-size: 20px; display: block; margin-bottom: 3px; }
+  .build-item .cost { font-size: 9px; color: #7a8aa5; margin-top: 2px; }
+
+  /* 科技树 */
+  .tech-branch { margin-bottom: 8px; }
+  .tech-branch-title {
+    font-size: 11px; color: #f39c12; font-weight: 600;
+    margin-bottom: 4px; padding: 4px 8px;
+    background: rgba(243,156,18,0.1); border-radius: 6px;
+  }
+  .tech-item {
+    padding: 7px 10px; margin: 3px 0;
+    background: rgba(30,40,55,0.5);
+    border: 1px solid rgba(74,158,255,0.1);
+    border-radius: 6px; cursor: pointer;
+    transition: all .2s; display: flex; justify-content: space-between;
+    align-items: center;
+  }
+  .tech-item:hover:not(.locked):not(.researched) {
+    border-color: rgba(74,158,255,0.4);
+    background: rgba(40,55,80,0.7);
+  }
+  .tech-item.researched {
+    border-color: rgba(46,204,113,0.4);
+    background: rgba(46,204,113,0.1);
+  }
+  .tech-item.researching {
+    border-color: rgba(243,156,18,0.5);
+    background: rgba(243,156,18,0.08);
+  }
+  .tech-item.locked { opacity: 0.5; cursor: not-allowed; }
+  .tech-item .t-name { font-size: 12px; font-weight: 500; }
+  .tech-item.researched .t-name { color: #2ecc71; }
+  .tech-item.researching .t-name { color: #f39c12; }
+  .tech-item .t-cost { font-size: 10px; color: #7a8aa5; }
+  .tech-item .t-progress {
+    flex: 1; height: 3px; margin: 0 8px;
+    background: rgba(30,40,55,0.8); border-radius: 2px;
+    overflow: hidden;
+  }
+  .tech-item .t-progress-fill {
+    height: 100%; background: linear-gradient(90deg, #f39c12, #e67e22);
+    border-radius: 2px; transition: width .3s;
+  }
+
+  /* 军事面板 */
+  .military-info {
+    background: rgba(231,76,60,0.08);
+    border: 1px solid rgba(231,76,60,0.2);
+    border-radius: 8px; padding: 10px; margin-bottom: 8px;
+  }
+  .military-row {
+    display: flex; justify-content: space-between;
+    font-size: 12px; margin: 3px 0;
+  }
+  .military-row .label { color: #7a8aa5; }
+  .military-row .val { color: #e74c3c; font-weight: 600; }
+
+  .army-btn {
+    width: 100%; padding: 8px; margin: 4px 0;
+    background: linear-gradient(180deg, #e74c3c, #c0392b);
+    color: white; border: none; border-radius: 8px;
+    cursor: pointer; font-weight: 600; font-size: 12px;
+    transition: all .2s;
+  }
+  .army-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(231,76,60,0.4); }
+  .army-btn.secondary {
+    background: rgba(30,40,55,0.8);
+    border: 1px solid rgba(231,76,60,0.3);
+    color: #e74c3c;
+  }
+  .army-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* 势力列表 */
+  .faction-item {
+    padding: 8px 10px; margin: 4px 0;
+    background: rgba(30,40,55,0.5);
+    border: 1px solid rgba(74,158,255,0.1);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .faction-item:hover { background: rgba(40,55,80,0.7); }
+  .faction-item.selected {
+    border-color: #4a9eff;
+    background: rgba(74,158,255,0.12);
+    box-shadow: 0 0 10px rgba(74,158,255,0.2);
+  }
+  .faction-item.friendly { border-color: rgba(46,204,113,0.3); }
+  .faction-item.hostile { border-color: rgba(231,76,60,0.3); }
+  .faction-item.allied { border-color: rgba(155,89,182,0.4); }
+  .faction-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 4px;
+  }
+  .faction-name { font-size: 12px; font-weight: 600; }
+  .faction-rel {
+    font-size: 10px; padding: 1px 6px; border-radius: 8px;
+  }
+  .faction-rel.friendly { background: rgba(46,204,113,0.2); color: #2ecc71; }
+  .faction-rel.hostile { background: rgba(231,76,60,0.2); color: #e74c3c; }
+  .faction-rel.neutral { background: rgba(243,156,18,0.2); color: #f39c12; }
+  .faction-rel.allied { background: rgba(155,89,182,0.25); color: #9b59b6; }
+  .faction-info { font-size: 10px; color: #7a8aa5; }
+  .faction-power { font-size: 10px; color: #f39c12; margin-top: 2px; }
+
+  /* 人物列表 */
+  .person-item {
+    padding: 7px 10px; margin: 3px 0;
+    background: rgba(30,40,55,0.5);
+    border-radius: 8px; cursor: pointer; font-size: 12px;
+    border-left: 3px solid transparent; transition: all .15s;
+  }
+  .person-item:hover { background: rgba(40,55,80,0.7); }
+  .person-item.hero { border-left-color: #f39c12; background: rgba(243,156,18,0.08); }
+  .person-item.selected {
+    border-left-color: #4a9eff; background: rgba(74,158,255,0.1);
+  }
+  .person-item .p-head { display: flex; justify-content: space-between; align-items: center; }
+  .person-item .name { font-weight: 600; color: #e8e6e3; font-size: 12px; }
+  .person-item.hero .name { color: #f39c12; }
+  .person-item .job { color: #7a8aa5; font-size: 10px; }
+  .person-item .lv {
+    font-size: 10px;
+    background: linear-gradient(135deg, #4a9eff, #2d7dd2);
+    color: white; padding: 1px 6px; border-radius: 8px; font-weight: 600;
+  }
+  .p-bars { display: flex; gap: 3px; margin-top: 5px; }
+  .mini-bar { flex: 1; height: 3px; background: rgba(20,28,40,0.8); border-radius: 2px; overflow: hidden; }
+  .mini-bar-fill { height: 100%; border-radius: 2px; transition: width .3s; }
+  .hp-fill { background: linear-gradient(90deg, #c0392b, #e74c3c); }
+  .exp-fill { background: linear-gradient(90deg, #27ae60, #2ecc71); }
+
+  /* 底部面板 */
+  #bottom-panel {
+    position: absolute; bottom: 0; left: 0; right: 300px;
+    background: linear-gradient(0deg, rgba(12,16,24,0.96) 0%, rgba(12,16,24,0.8) 100%);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(74,158,255,0.1);
+    padding: 8px 16px; z-index: 90;
+    display: flex; gap: 14px;
+  }
+  #log-panel { flex: 1; max-height: 85px; overflow-y: auto; font-size: 12px; }
+  .log-entry { padding: 1px 0; color: #a0b0c5; line-height: 1.5; animation: slideIn .2s; }
+  @keyframes slideIn { from{opacity:0;transform:translateX(-5px)} to{opacity:1;transform:translateX(0)} }
+  .log-entry.quest { color: #6ab7ff; }
+  .log-entry.combat { color: #e74c3c; }
+  .log-entry.myth { color: #9b59b6; }
+  .log-entry.good { color: #2ecc71; }
+  .log-entry.warn { color: #f39c12; }
+  .log-entry.military { color: #e67e22; }
+  .log-time { color: #5a6a80; margin-right: 6px; font-family: 'Consolas', monospace; font-size: 10px; }
+
+  #hero-panel {
+    width: 210px; border-left: 1px solid rgba(74,158,255,0.1);
+    padding-left: 12px; flex-shrink: 0;
+  }
+  .hero-avatar {
+    width: 48px; height: 48px;
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+    border-radius: 10px; float: left; margin-right: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    box-shadow: 0 4px 12px rgba(243,156,18,0.3);
+  }
+  .hero-info { overflow: hidden; }
+  .hero-info .name { color: #f39c12; font-weight: 600; font-size: 13px; }
+  .hero-info .title { color: #7a8aa5; font-size: 11px; margin-top: 1px; }
+  .hero-stats {
+    clear: both; padding-top: 6px;
+    font-size: 11px; line-height: 1.6; color: #a0b0c5;
+  }
+  .hero-stats div { display: flex; justify-content: space-between; }
+  .hero-stats span { color: #6ab7ff; font-weight: 600; }
+
+  /* 工具条 */
+  #toolbar {
+    position: absolute; bottom: 105px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 5px; z-index: 85;
+    background: rgba(12,16,24,0.92); backdrop-filter: blur(10px);
+    padding: 5px; border-radius: 14px;
+    border: 1px solid rgba(74,158,255,0.15);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .tool-btn {
+    width: 44px; height: 44px;
+    background: rgba(30,40,55,0.6);
+    border: 1px solid transparent;
+    color: #a0b0c5; cursor: pointer;
+    border-radius: 10px; font-size: 18px;
+    transition: all .15s;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    position: relative;
+  }
+  .tool-btn:hover {
+    background: rgba(45,60,85,0.8); color: #fff;
+    transform: translateY(-2px);
+  }
+  .tool-btn.active {
+    background: linear-gradient(180deg, #4a9eff, #2d7dd2);
+    color: white; box-shadow: 0 4px 12px rgba(74,158,255,0.4);
+  }
+  .tool-btn.attack {
+    background: rgba(231,76,60,0.15);
+    border-color: rgba(231,76,60,0.3);
+    color: #e74c3c;
+  }
+  .tool-btn.attack.active {
+    background: linear-gradient(180deg, #e74c3c, #c0392b);
+    color: white; box-shadow: 0 4px 12px rgba(231,76,60,0.4);
+  }
+  .tool-btn .hotkey {
+    position: absolute; top: 1px; right: 3px;
+    font-size: 8px; color: #5a6a80; font-weight: 600;
+  }
+  .tool-btn.active .hotkey { color: rgba(255,255,255,0.7); }
+
+  /* 新手引导 */
+  #tutorial-overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+    z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #tutorial-overlay.hidden { display: none; }
+  .tutorial-box {
+    background: linear-gradient(180deg, #1a2030 0%, #0e1218 100%);
+    border: 1px solid rgba(74,158,255,0.3);
+    border-radius: 16px; padding: 28px 32px;
+    max-width: 500px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(74,158,255,0.1);
+    animation: popIn .4s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes popIn { from{opacity:0;transform:scale(.9)} to{opacity:1;transform:scale(1)} }
+  .tutorial-box h2 {
+    color: #6ab7ff; font-size: 22px;
+    margin-bottom: 10px; text-align: center; font-weight: 700;
+  }
+  .tutorial-box p {
+    color: #d0d8e4; line-height: 1.8;
+    margin-bottom: 12px; font-size: 14px;
+  }
+  .tutorial-box .btn {
+    display: block; width: 100%; padding: 11px;
+    background: linear-gradient(180deg, #4a9eff, #2d7dd2);
+    color: white; border: none; border-radius: 10px;
+    cursor: pointer; font-weight: 600; font-size: 14px;
+    text-align: center; transition: all .2s;
+    box-shadow: 0 4px 16px rgba(74,158,255,0.4);
+    margin-top: 8px;
+  }
+  .tutorial-box .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(74,158,255,0.5); }
+  .tutorial-box .btn.secondary {
+    background: rgba(30,40,55,0.8); box-shadow: none; margin-top: 6px;
+    border: 1px solid rgba(74,158,255,0.2);
+  }
+  .tutorial-steps {
+    display: flex; gap: 6px; justify-content: center;
+    margin: 14px 0;
+  }
+  .step-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: rgba(100,140,200,0.3); transition: all .3s;
+  }
+  .step-dot.active {
+    background: #4a9eff;
+    box-shadow: 0 0 8px rgba(74,158,255,0.6);
+    transform: scale(1.2);
+  }
+
+  /* 通知 */
+  #notifications {
+    position: absolute; top: 64px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    display: flex; flex-direction: column; gap: 5px;
+    align-items: center;
+  }
+  .notification {
+    background: rgba(12,16,24,0.95); backdrop-filter: blur(10px);
+    border: 1px solid rgba(74,158,255,0.3);
+    border-radius: 10px; padding: 8px 18px;
+    color: #e8e6e3; font-size: 13px;
+    animation: slideDown .3s cubic-bezier(.34,1.56,.64,1), fadeOut .5s ease 3.5s forwards;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    max-width: 400px; text-align: center; font-weight: 500;
+  }
+  .notification.quest { border-color: rgba(74,158,255,0.5); }
+  .notification.combat { border-color: rgba(231,76,60,0.5); }
+  .notification.myth { border-color: rgba(155,89,182,0.5); }
+  .notification.good { border-color: rgba(46,204,113,0.5); }
+  .notification.military { border-color: rgba(230,126,34,0.5); }
+  @keyframes slideDown { from{transform:translateY(-20px);opacity:0} to{transform:translateY(0);opacity:1} }
+  @keyframes fadeOut { to{opacity:0;transform:translateY(-8px)} }
+
+  /* 操作提示 */
+  #help-hint {
+    position: absolute; bottom: 105px; right: 314px;
+    background: rgba(12,16,24,0.85); backdrop-filter: blur(8px);
+    border: 1px solid rgba(74,158,255,0.12);
+    border-radius: 8px; padding: 7px 11px;
+    font-size: 10px; color: #7a8aa5; z-index: 80;
+    line-height: 1.7;
+  }
+  #help-hint kbd {
+    background: rgba(30,40,55,0.8);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid rgba(74,158,255,0.2);
+    color: #6ab7ff; font-family: 'Consolas', monospace;
+    font-size: 9px; font-weight: 600;
+  }
+
+  /* 模式指示器 */
+  #mode-indicator {
+    position: absolute; top: 54px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(231,76,60,0.9);
+    color: white; padding: 6px 16px;
+    border-radius: 20px; font-size: 12px;
+    font-weight: 600; z-index: 95;
+    box-shadow: 0 4px 12px rgba(231,76,60,0.4);
+    display: none;
+  }
+  #mode-indicator.active { display: block; animation: modePulse 2s infinite; }
+  @keyframes modePulse {
+    0%,100% { box-shadow: 0 4px 12px rgba(231,76,60,0.4); }
+    50% { box-shadow: 0 4px 20px rgba(231,76,60,0.7); }
+  }
+
+  /* 滚动条 */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(74,158,255,0.25); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(74,158,255,0.4); }
+</style>
+</head>
+<body>
+<div id="game-container">
+  <div id="canvas-wrap">
+    <canvas id="game"></canvas>
+
+    <!-- 顶部状态栏 -->
+    <div id="topbar">
+      <div class="chapter-badge" id="chapter-badge">第一章 · 蛮荒初启</div>
+      <div class="resource"><span class="icon">👥</span><span class="val" id="res-people">12</span><span class="label">族人</span></div>
+      <div class="resource"><span class="icon">🌾</span><span class="val" id="res-food">200</span><span class="label">粮食</span></div>
+      <div class="resource"><span class="icon">🪵</span><span class="val" id="res-wood">80</span><span class="label">木材</span></div>
+      <div class="resource"><span class="icon">🪨</span><span class="val" id="res-stone">30</span><span class="label">石料</span></div>
+      <div class="resource"><span class="icon">🔔</span><span class="val" id="res-bronze">0</span><span class="label">青铜</span></div>
+      <div class="resource"><span class="icon">💎</span><span class="val" id="res-money">0</span><span class="label">贝币</span></div>
+      <div class="resource"><span class="icon">📚</span><span class="val" id="res-knowledge">0</span><span class="label">学识</span></div>
+      <div class="resource" id="weather-display" title="当前天气"><span class="icon" id="weather-icon">☀️</span><span class="val" id="weather-name" style="color:#f1c40f;">晴天</span></div>
+    </div>
+
+    <!-- 速度控制 -->
+    <div id="speed-controls">
+      <button class="speed-btn active" onclick="setSpeed(0)" id="spd-0">⏸</button>
+      <button class="speed-btn" onclick="setSpeed(1)" id="spd-1">▶</button>
+      <button class="speed-btn" onclick="setSpeed(2)" id="spd-2">▶▶</button>
+      <button class="speed-btn" onclick="setSpeed(3)" id="spd-3">▶▶▶</button>
+    </div>
+
+    <!-- 模式指示器 -->
+    <div id="mode-indicator">⚔️ 攻击模式 — 点击目标出征</div>
+
+    <!-- 左侧面板 -->
+    <div id="left-panel">
+      <div class="panel">
+        <div class="panel-title">📜 当前任务</div>
+        <div class="main-quest">
+          <div class="q-name" id="mq-name">任务一：安家落户</div>
+          <div class="q-desc" id="mq-desc">建造第一座房屋</div>
+          <div class="q-progress"><div class="q-progress-fill" id="mq-progress" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">🏛️ 势力范围</div>
+        <div style="font-size:11px;color:#7a8aa5;">华夏部落影响力</div>
+        <div id="influence-bar"><div id="influence-fill" style="width:15%"></div></div>
+        <div class="influence-stat">
+          <span>影响力</span>
+          <span id="influence-val">150 / 1000</span>
+        </div>
+        <div class="influence-stat" style="margin-top:2px;">
+          <span>控制区域</span>
+          <span id="territory-val">中心区域</span>
+        </div>
+        <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(74,158,255,0.1);">
+          <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:6px;">
+            <span style="color:#7a8aa5;">领地等级</span>
+            <span id="territory-level" style="color:#f39c12; font-weight:600;">Lv.1 村落</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:8px;">
+            <span style="color:#7a8aa5;">管辖范围</span>
+            <span id="territory-radius" style="color:#6ab7ff;">12 格</span>
+          </div>
+          <button id="upgrade-territory-btn" onclick="upgradeTerritory()" 
+            style="width:100%; padding:6px; background:linear-gradient(180deg,#f39c12,#e67e22); 
+                   border:none; border-radius:6px; color:white; font-weight:600; 
+                   cursor:pointer; font-size:11px;">
+            🏛️ 升级领地 (200影响力)
+          </button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">📋 待办事项</div>
+        <div id="side-quests">
+          <div class="side-quest" data-id="q1">
+            <span>🏠 建造3座房屋</span>
+            <span class="q-prog" id="q1-prog">0/3</span>
+          </div>
+          <div class="side-quest" data-id="q2">
+            <span>🌾 开垦5亩农田</span>
+            <span class="q-prog" id="q2-prog">0/5</span>
+          </div>
+          <div class="side-quest" data-id="q3">
+            <span>⚔️ 狩猎3头野兽</span>
+            <span class="q-prog" id="q3-prog">0/3</span>
+          </div>
+          <div class="side-quest" data-id="q4">
+            <span>🔥 建造祭坛</span>
+            <span class="q-prog" id="q4-prog">0/1</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 工具条 -->
+    <div id="toolbar">
+      <div class="tool-btn active" onclick="setTool('build')" id="tool-build" title="建造">
+        🏗️<span class="hotkey">1</span>
+      </div>
+      <div class="tool-btn" onclick="setTool('farm')" id="tool-farm" title="农田">
+        🌾<span class="hotkey">2</span>
+      </div>
+      <div class="tool-btn" onclick="setTool('chop')" id="tool-chop" title="伐木">
+        🪓<span class="hotkey">3</span>
+      </div>
+      <div class="tool-btn" onclick="setTool('mine')" id="tool-mine" title="采矿">
+        ⛏️<span class="hotkey">4</span>
+      </div>
+      <div class="tool-btn" onclick="setTool('road')" id="tool-road" title="道路">
+        🛤️<span class="hotkey">5</span>
+      </div>
+      <div class="tool-btn attack" onclick="setTool('attack')" id="tool-attack" title="攻击">
+        ⚔️<span class="hotkey">6</span>
+      </div>
+      <div class="tool-btn" onclick="setTool('inspect')" id="tool-inspect" title="查看">
+        🔍<span class="hotkey">7</span>
+      </div>
+    </div>
+
+    <!-- 通知区域 -->
+    <div id="notifications"></div>
+
+    <!-- 底部面板 -->
+    <div id="bottom-panel">
+      <div id="log-panel"></div>
+      <div id="hero-panel">
+        <div class="hero-avatar">👑</div>
+        <div class="hero-info">
+          <div class="name" id="hero-name">轩辕氏</div>
+          <div class="title">部落首领 · Lv.1</div>
+        </div>
+        <div class="hero-stats">
+          <div>体力 <span id="hero-hp">100/100</span></div>
+          <div>灵力 <span id="hero-mp">50/50</span></div>
+          <div>经验 <span id="hero-exp">0/100</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 操作提示 -->
+    <div id="help-hint">
+      <div><kbd>WASD</kbd> 移动 · <kbd>滚轮</kbd> 缩放</div>
+      <div><kbd>左键拖拽</kbd> 操作 · <kbd>右键</kbd> 取消</div>
+      <div><kbd>空格</kbd> 暂停 · <kbd>Tab</kbd> 切换面板</div>
+    </div>
+
+    <!-- 新手引导 -->
+    <div id="tutorial-overlay">
+      <div class="tutorial-box">
+        <h2 id="tut-title">🌅 欢迎来到华夏</h2>
+        <p id="tut-text">
+          你是部落首领 <b style="color:#f39c12;">轩辕氏</b>，
+          带领族人历经迁徙，终于来到了黄河之畔。
+          这片土地肥沃而充满生机，但也隐藏着未知的危险...
+        </p>
+        <p id="tut-text2" style="font-size:13px;color:#7a8aa5;">
+          在接下来的旅程中，你将带领族人从蛮荒部落一步步发展，最终建立不朽的文明。
+        </p>
+        <div class="tutorial-steps">
+          <div class="step-dot active" id="step-0"></div>
+          <div class="step-dot" id="step-1"></div>
+          <div class="step-dot" id="step-2"></div>
+          <div class="step-dot" id="step-3"></div>
+        </div>
+        <button class="btn" id="tut-btn" onclick="nextTutorial()">开始征程</button>
+        <button class="btn secondary" onclick="skipTutorial()">跳过引导</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右侧面板 -->
+  <div id="sidebar">
+    <div class="tab-bar">
+      <div class="tab active" onclick="switchTab('build')">🏗️ 建造</div>
+      <div class="tab" onclick="switchTab('tech')">📚 科技</div>
+      <div class="tab" onclick="switchTab('military')">⚔️ 军事</div>
+      <div class="tab" onclick="switchTab('faction')">🏛️ 势力</div>
+      <div class="tab" onclick="switchTab('people')">👥 族人</div>
+    </div>
+
+    <!-- 建造页 -->
+    <div id="tab-build" class="tab-content active">
+      <h3>🏠 居住建筑</h3>
+      <div class="build-grid">
+        <div class="build-item selected" onclick="selectBuild('house')">
+          <span class="icon">🏠</span>房屋<div class="cost">木10 石5</div>
+        </div>
+        <div class="build-item" onclick="selectBuild('farm_hut')">
+          <span class="icon">🏚️</span>农舍<div class="cost">木8 石3</div>
+        </div>
+        <div class="build-item" onclick="selectBuild('storage')">
+          <span class="icon">📦</span>仓廪<div class="cost">木12 石8</div>
+        </div>
+      </div>
+
+      <h3>🏭 生产建筑</h3>
+      <div class="build-grid">
+        <div class="build-item" onclick="selectBuild('workshop')">
+          <span class="icon">🔨</span>作坊<div class="cost">木15 石10</div>
+        </div>
+        <div class="build-item" onclick="selectBuild('well')">
+          <span class="icon">💧</span>水井<div class="cost">石15</div>
+        </div>
+        <div class="build-item" onclick="selectBuild('farm')">
+          <span class="icon">🌾</span>农田<div class="cost">免费</div>
+        </div>
+      </div>
+
+      <h3>🛡️ 防御与祭祀</h3>
+      <div class="build-grid">
+        <div class="build-item" onclick="selectBuild('altar')">
+          <span class="icon">🔥</span>祭坛<div class="cost">石20 木10</div>
+        </div>
+        <div class="build-item" onclick="selectBuild('wall')">
+          <span class="icon">🧱</span>围墙<div class="cost">石3</div>
+        </div>
+        <div class="build-item" onclick="selectBuild('watchtower')">
+          <span class="icon">🗼</span>哨塔<div class="cost">木15 石10</div>
+        </div>
+      </div>
+
+      <h3>📚 学宫与研究院</h3>
+      <div class="build-grid">
+        <div class="build-item" onclick="selectBuild('school')">
+          <span class="icon">📖</span>学堂<div class="cost">木20 石15</div>
+        </div>
+        <div class="build-item" onclick="selectBuild('library')">
+          <span class="icon">📜</span>藏书阁<div class="cost">木25 石20</div>
+        </div>
+        <div class="build-item locked" id="build-bronze_forge" onclick="selectBuild('bronze_forge')">
+          <span class="icon">🏛️</span>青铜坊<div class="cost">需研究</div>
+        </div>
+      </div>
+
+      <h3>⚔️ 军事建筑</h3>
+      <div class="build-grid">
+        <div class="build-item" onclick="selectBuild('barracks')">
+          <span class="icon">🏕️</span>兵营<div class="cost">木20 石15</div>
+        </div>
+        <div class="build-item" onclick="selectBuild('archery')">
+          <span class="icon">🏹</span>演武场<div class="cost">木18 石8</div>
+        </div>
+        <div class="build-item locked">
+          <span class="icon">🏰</span>城门楼<div class="cost">青铜时代</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 科技树页 -->
+    <div id="tab-tech" class="tab-content">
+      <div class="military-info" style="background:rgba(74,158,255,0.08);border-color:rgba(74,158,255,0.2);">
+        <div class="military-row">
+          <span class="label">学识点</span>
+          <span class="val" id="tech-points" style="color:#6ab7ff;">0</span>
+        </div>
+        <div class="military-row">
+          <span class="label">每月产出</span>
+          <span class="val" style="color:#6ab7ff;">+0.5/月</span>
+        </div>
+        <div class="military-row">
+          <span class="label">当前时代</span>
+          <span class="val" style="color:#f39c12;">蛮荒时代</span>
+        </div>
+      </div>
+
+      <div class="tech-branch">
+        <div class="tech-branch-title">🔥 基础技艺</div>
+        <div class="tech-item researched" data-tech="fire">
+          <span class="t-name">钻木取火</span>
+          <span class="t-cost">已掌握</span>
+        </div>
+        <div class="tech-item" data-tech="pottery" onclick="researchTech('pottery')">
+          <span class="t-name">制陶技艺</span>
+          <span class="t-cost">20学识</span>
+        </div>
+        <div class="tech-item" data-tech="textiles" onclick="researchTech('textiles')">
+          <span class="t-name">纺织缝纫</span>
+          <span class="t-cost">30学识</span>
+        </div>
+        <div class="tech-item" data-tech="agriculture" onclick="researchTech('agriculture')">
+          <span class="t-name">原始农耕</span>
+          <span class="t-cost">25学识</span>
+        </div>
+        <div class="tech-item" data-tech="animal_husbandry" onclick="researchTech('animal_husbandry')">
+          <span class="t-name">驯养家畜</span>
+          <span class="t-cost">35学识</span>
+        </div>
+      </div>
+
+      <div class="tech-branch">
+        <div class="tech-branch-title">⚒️ 工具与建造</div>
+        <div class="tech-item" data-tech="stone_tools" onclick="researchTech('stone_tools')">
+          <span class="t-name">磨制石器</span>
+          <span class="t-cost">15学识</span>
+        </div>
+        <div class="tech-item" data-tech="woodworking" onclick="researchTech('woodworking')">
+          <span class="t-name">木作工艺</span>
+          <span class="t-cost">25学识</span>
+        </div>
+        <div class="tech-item" data-tech="masonry" onclick="researchTech('masonry')">
+          <span class="t-name">夯土筑城</span>
+          <span class="t-cost">40学识</span>
+        </div>
+        <div class="tech-item locked" data-tech="bronze_smelting" onclick="researchTech('bronze_smelting')">
+          <span class="t-name">青铜冶炼</span>
+          <span class="t-cost">需80学识</span>
+        </div>
+      </div>
+
+      <div class="tech-branch">
+        <div class="tech-branch-title">⚔️ 军事与战争</div>
+        <div class="tech-item" data-tech="basic_weapons" onclick="researchTech('basic_weapons')">
+          <span class="t-name">石矛石斧</span>
+          <span class="t-cost">20学识</span>
+        </div>
+        <div class="tech-item" data-tech="archery_tech" onclick="researchTech('archery_tech')">
+          <span class="t-name">弓箭制作</span>
+          <span class="t-cost">30学识</span>
+        </div>
+        <div class="tech-item" data-tech="tactics" onclick="researchTech('tactics')">
+          <span class="t-name">原始战术</span>
+          <span class="t-cost">45学识</span>
+        </div>
+        <div class="tech-item locked" data-tech="bronze_weapons" onclick="researchTech('bronze_weapons')">
+          <span class="t-name">青铜兵器</span>
+          <span class="t-cost">青铜时代</span>
+        </div>
+      </div>
+
+      <div class="tech-branch">
+        <div class="tech-branch-title">📜 文化与制度</div>
+        <div class="tech-item" data-tech="oral_tradition" onclick="researchTech('oral_tradition')">
+          <span class="t-name">结绳记事</span>
+          <span class="t-cost">15学识</span>
+        </div>
+        <div class="tech-item" data-tech="medicine" onclick="researchTech('medicine')">
+          <span class="t-name">草药医学</span>
+          <span class="t-cost">35学识</span>
+        </div>
+        <div class="tech-item" data-tech="music" onclick="researchTech('music')">
+          <span class="t-name">乐舞祭祀</span>
+          <span class="t-cost">25学识</span>
+        </div>
+        <div class="tech-item locked" data-tech="writing" onclick="researchTech('writing')">
+          <span class="t-name">文字发明</span>
+          <span class="t-cost">青铜时代</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 军事页 -->
+    <div id="tab-military" class="tab-content">
+      <div class="military-info">
+        <div class="military-row">
+          <span class="label">总兵力</span>
+          <span class="val" id="army-total">0 / 5</span>
+        </div>
+        <div class="military-row">
+          <span class="label">战士</span>
+          <span class="val" id="army-warrior">0</span>
+        </div>
+        <div class="military-row">
+          <span class="label">弓箭手</span>
+          <span class="val" id="army-archer">0</span>
+        </div>
+        <div class="military-row">
+          <span class="label">总攻击力</span>
+          <span class="val" id="army-atk">0</span>
+        </div>
+        <div class="military-row">
+          <span class="label">总防御力</span>
+          <span class="val" id="army-def">0</span>
+        </div>
+      </div>
+
+      <h3>⚔️ 军事行动</h3>
+      <button class="army-btn" onclick="startAttackMode()">
+        🎯 出征讨伐
+      </button>
+      <button class="army-btn secondary" onclick="defendMode()">
+        🛡️ 全员防守
+      </button>
+      <button class="army-btn secondary" onclick="patrolMode()">
+        🚶 巡逻警戒
+      </button>
+
+      <h3>📋 战斗记录</h3>
+      <div id="battle-log" style="font-size:11px;color:#7a8aa5;max-height:120px;overflow-y:auto;">
+        <div style="padding:4px 0;">暂无战斗记录...</div>
+      </div>
+    </div>
+
+    <!-- 势力页 -->
+    <div id="tab-faction" class="tab-content">
+      <div class="military-info" style="background:rgba(243,156,18,0.08);border-color:rgba(243,156,18,0.2);">
+        <div class="military-row">
+          <span class="label">我方势力</span>
+          <span class="val" style="color:#f39c12;">华夏部落</span>
+        </div>
+        <div class="military-row">
+          <span class="label">势力等级</span>
+          <span class="val" style="color:#f39c12;">部落</span>
+        </div>
+        <div class="military-row">
+          <span class="label">影响力</span>
+          <span class="val" id="faction-influence" style="color:#f39c12;">150</span>
+        </div>
+      </div>
+
+      <h3>🌍 周边势力</h3>
+      <div id="faction-list">
+        <div class="faction-item neutral">
+          <div class="faction-head">
+            <span class="faction-name">🌿 神农氏</span>
+            <span class="faction-rel neutral">中立</span>
+          </div>
+          <div class="faction-info">农耕部落 · 善种植草药 · 西方</div>
+        </div>
+        <div class="faction-item neutral">
+          <div class="faction-head">
+            <span class="faction-name">🔥 燧人氏</span>
+            <span class="faction-rel neutral">中立</span>
+          </div>
+          <div class="faction-info">火神部落 · 善用火攻 · 南方</div>
+        </div>
+        <div class="faction-item hostile">
+          <div class="faction-head">
+            <span class="faction-name">🐗 九黎部落</span>
+            <span class="faction-rel hostile">敌对</span>
+          </div>
+          <div class="faction-info">好战部落 · 蚩尤统领 · 东方</div>
+        </div>
+        <div class="faction-item neutral">
+          <div class="faction-head">
+            <span class="faction-name">🐉 共工氏</span>
+            <span class="faction-rel neutral">中立</span>
+          </div>
+          <div class="faction-info">水神部落 · 善治水 · 北方</div>
+        </div>
+      </div>
+
+      <h3>🤝 外交行动</h3>
+      <button class="army-btn secondary" onclick="diplomacy('trade')">
+        🤝 派使者通商
+      </button>
+      <button class="army-btn secondary" onclick="diplomacy('alliance')">
+        🤜🤛 提议结盟
+      </button>
+      <button class="army-btn" onclick="diplomacy('declare_war')">
+        ⚔️ 宣战讨伐
+      </button>
+    </div>
+
+    <!-- 族人页 -->
+    <div id="tab-people" class="tab-content">
+      <h3>👑 首领</h3>
+      <div class="person-item hero selected">
+        <div class="p-head">
+          <span class="name">轩辕氏</span>
+          <span class="lv">Lv.1</span>
+        </div>
+        <div style="font-size:10px;color:#f39c12;margin-top:2px;">部落首领</div>
+        <div class="p-bars">
+          <div class="mini-bar"><div class="mini-bar-fill hp-fill" style="width:100%"></div></div>
+          <div class="mini-bar"><div class="mini-bar-fill exp-fill" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <h3>👥 族人 <span style="font-weight:normal;font-size:10px;color:#7a8aa5;float:right;" id="people-count">11人</span></h3>
+      <div id="people-list" style="max-height:300px;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== 常量 ====================
+const TS = 28;
+const MW = 100;
+const MH = 80;
+
+const T = {
+  GRASS:0, DIRT:1, SAND:2, WATER:3, TREE:4,
+  STONE:5, MOUNTAIN:6, IRON:7, COPPER:8, GOLD:9,
+  ROAD:10, FLOOR:11, HOUSE:12, FARM:13,
+  WORKSHOP:14, STORAGE:15, WELL:16, ALTAR:17,
+  WALL:18, WATCHTOWER:19, FARM_HUT:20,
+  SCHOOL:21, LIBRARY:22, BARRACKS:23, ARCHERY:24,
+  BRONZE_FORGE:25
+};
+
+const BUILDINGS = {
+  house:    { name:'房屋',   tile:T.HOUSE,    cost:{wood:10,stone:5},  capacity:4, influence:5 },
+  farm_hut: { name:'农舍',   tile:T.FARM_HUT, cost:{wood:8,stone:3},   capacity:2, influence:3 },
+  workshop: { name:'作坊',   tile:T.WORKSHOP, cost:{wood:15,stone:10}, influence:8 },
+  storage:  { name:'仓廪',   tile:T.STORAGE,  cost:{wood:12,stone:8},  influence:4 },
+  well:     { name:'水井',   tile:T.WELL,     cost:{stone:15},          influence:6 },
+  altar:    { name:'祭坛',   tile:T.ALTAR,    cost:{stone:20,wood:10}, influence:15 },
+  wall:     { name:'围墙',   tile:T.WALL,     cost:{stone:3},          influence:1 },
+  watchtower:{name:'哨塔',   tile:T.WATCHTOWER,cost:{wood:15,stone:10},influence:10 },
+  farm:     { name:'农田',   tile:T.FARM,     cost:{},                 influence:1 },
+  school:   { name:'学堂',   tile:T.SCHOOL,   cost:{wood:20,stone:15}, influence:12, knowledge:0.5 },
+  library:  { name:'藏书阁', tile:T.LIBRARY,  cost:{wood:25,stone:20}, influence:15, knowledge:1 },
+  barracks: { name:'兵营',   tile:T.BARRACKS, cost:{wood:20,stone:15}, influence:10, troops:5 },
+  archery:  { name:'演武场', tile:T.ARCHERY,  cost:{wood:18,stone:8},  influence:8,  troops:3 },
+  bronze_forge:{name:'青铜坊',tile:T.BRONZE_FORGE,cost:{wood:30,stone:25}, influence:20, tech:'bronze_smelting' }
+};
+
+// 科技树
+const TECHS = {
+  fire:             { name:'钻木取火',     cost:0,   era:0, researched:true,  branch:'basic', effect:'熟食增加健康' },
+  pottery:          { name:'制陶技艺',     cost:20,  era:0, researched:false, branch:'basic', effect:'解锁陶器生产' },
+  textiles:         { name:'纺织缝纫',     cost:30,  era:0, researched:false, branch:'basic', effect:'提升民心+5' },
+  agriculture:      { name:'原始农耕',     cost:25,  era:0, researched:false, branch:'basic', effect:'农田产量+20%' },
+  animal_husbandry: { name:'驯养家畜',     cost:35,  era:0, researched:false, branch:'basic', effect:'额外食物来源' },
+  stone_tools:      { name:'磨制石器',     cost:15,  era:0, researched:false, branch:'tools', effect:'采集效率+20%' },
+  woodworking:      { name:'木作工艺',     cost:25,  era:0, researched:false, branch:'tools', effect:'建造速度+30%' },
+  masonry:          { name:'夯土筑城',     cost:40,  era:0, researched:false, branch:'tools', effect:'城墙防御+50%' },
+  basic_weapons:    { name:'石矛石斧',     cost:20,  era:0, researched:false, branch:'military', effect:'战士攻击+3' },
+  archery_tech:     { name:'弓箭制作',     cost:30,  era:0, researched:false, branch:'military', effect:'解锁弓箭手' },
+  tactics:          { name:'原始战术',     cost:45,  era:0, researched:false, branch:'military', effect:'部队攻击+20%' },
+  oral_tradition:   { name:'结绳记事',     cost:15,  era:0, researched:false, branch:'culture', effect:'学识产出+20%' },
+  medicine:         { name:'草药医学',     cost:35,  era:0, researched:false, branch:'culture', effect:'族人回复+50%' },
+  music:            { name:'乐舞祭祀',     cost:25,  era:0, researched:false, branch:'culture', effect:'祭祀效果+30%' },
+  bronze_smelting:  { name:'青铜冶炼',     cost:80,  era:1, researched:false, branch:'tools', effect:'进入青铜时代' },
+  bronze_weapons:   { name:'青铜兵器',     cost:120, era:1, researched:false, branch:'military', effect:'战士攻击+50%' },
+  writing:          { name:'文字发明',     cost:100, era:1, researched:false, branch:'culture', effect:'学识产出翻倍' }
+};
+
+// 周边势力
+const FACTIONS = [
+  { id:'shennong',  name:'神农氏', icon:'🌿',  rel:'neutral', power:120, desc:'农耕部落 · 善种植草药', dir:'西方' },
+  { id:'suiren',    name:'燧人氏', icon:'🔥',  rel:'neutral', power:100, desc:'火神部落 · 善用火攻', dir:'南方' },
+  { id:'jiuli',     name:'九黎部落', icon:'🐗', rel:'hostile', power:180, desc:'好战部落 · 蚩尤统领', dir:'东方' },
+  { id:'gonggong',  name:'共工氏', icon:'🐉',  rel:'neutral', power:140, desc:'水神部落 · 善治水患', dir:'北方' }
+];
+
+const SURNAMES = ['姜','姬','姚','姒','嬴','风','公孙','轩辕','高阳','高辛','陶唐','有虞','夏后'];
+const GNAMES = ['昊','辰','宇','轩','尧','舜','禹','启','汤','文','武','康','昭','穆'];
+const JOBS = ['农夫','工匠','猎户','樵夫','渔民','巫师','战士','陶工','织工','石匠','医者','乐师'];
+const MONSTER_TYPES = {
+  wolf:  { name:'野狼', icon:'🐺', hp:25, atk:4, def:1, exp:8,  color:'#7f8c8d', level:2 },
+  boar:  { name:'野猪', icon:'🐗', hp:45, atk:7, def:2, exp:12, color:'#8b4513', level:3 },
+  snake: { name:'巨蟒', icon:'🐍', hp:35, atk:9, def:1, exp:18, color:'#27ae60', level:5 },
+  tiger: { name:'猛虎', icon:'🐅', hp:70, atk:13,def:4, exp:35, color:'#e67e22', level:8 },
+  sprite:{ name:'山精', icon:'👹', hp:150,atk:20,def:7, exp:100,color:'#9b59b6',level:15,mythical:true }
+};
+
+const TUTORIAL_STEPS = [
+  { title:'🌅 欢迎来到华夏',
+    text:'你是部落首领 <b style="color:#f39c12;">轩辕氏</b>，带领族人历经迁徙，终于来到了黄河之畔。这片土地肥沃而充满生机，但也隐藏着未知的危险...',
+    text2:'在接下来的旅程中，你将带领族人从蛮荒部落一步步发展，最终建立不朽的文明。',
+    btn:'开始征程' },
+  { title:'🏠 第一步：建造房屋',
+    text:'族人需要住所才能安居乐业。让我们先建造几座房屋。',
+    text2:'💡 <b>操作</b>：右侧「建造」面板选择「房屋」→ 在地图上拖拽画出区域 → 松手建造。<br/><br/>快捷键 <kbd style="background:#1e2a40;padding:2px 6px;border-radius:4px;color:#6ab7ff;font-size:11px;">1</kbd> 快速选择建造工具',
+    btn:'我知道了' },
+  { title:'🌾 第二步：发展农业',
+    text:'民以食为天。有了住所之后，我们需要开垦农田来养活族人。',
+    text2:'💡 <b>操作</b>：选择「农田」工具（快捷键<kbd style="background:#1e2a40;padding:2px 6px;border-radius:4px;color:#6ab7ff;font-size:11px;">2</kbd>），在草地上拖拽画出农田。<br/><br/>每年农田产出粮食，粮食充足时人口会增长。',
+    btn:'继续' },
+  { title:'⚔️ 第三步：军事与科技',
+    text:'山林中有野兽，周边有其他部落。建立军队、研究科技，才能在这片土地上站稳脚跟。',
+    text2:'💡 <b>新系统</b>：<br/>• <b>科技树</b>：研究新技术，解锁建筑和加成<br/>• <b>军事</b>：组建军队，出征讨伐野兽和敌人<br/>• <b>势力</b>：与周边部落互动，扩张影响力<br/><br/>准备好了吗？',
+    btn:'开始游戏！' }
+];
+
+// ==================== 状态 ====================
+let map = [], mapVar = [];
+let people = [];
+let monsters = [];
+let jobs = [];
+
+let resources = { food:200, wood:80, stone:30, bronze:0, money:0, knowledge:0, mood:72, influence:150 };
+
+let camera = { x:0, y:0, zoom:1 };
+let currentTool = 'build';
+let selectedBuild = 'house';
+let gameSpeed = 0;
+let gameStarted = false;
+let tutorialStep = 0;
+let attackMode = false;
+let combatEffects = []; // 浮动战斗文字效果
+
+// 领地系统
+let territoryLevel = 1;
+let territoryRadius = 12; // 初始领地半径（格）
+const TERRITORY_LEVELS = [
+  { level: 1, radius: 12, name: '村落',  cost: 0 },
+  { level: 2, radius: 18, name: '集镇',  cost: 200 },
+  { level: 3, radius: 25, name: '城邑',  cost: 500 },
+  { level: 4, radius: 32, name: '都城',  cost: 1000 },
+  { level: 5, radius: 40, name: '王城',  cost: 2000 }
+];
+
+// 天气系统
+let weather = { type: 'sunny', duration: 0, intensity: 1 };
+const WEATHER_TYPES = {
+  sunny:    { name:'晴天',   icon:'☀️', color:'#f1c40f', effect:'正常生产' },
+  cloudy:   { name:'阴天',   icon:'⛅', color:'#95a5a6', effect:'采集-10%' },
+  rainy:    { name:'雨天',   icon:'🌧️', color:'#3498db', effect:'农田+20%, 移动减慢' },
+  storm:    { name:'暴雨',   icon:'⛈️', color:'#2980b9', effect:'采集-30%, 洪水风险' },
+  hot:      { name:'酷暑',   icon:'🔥', color:'#e74c3c', effect:'健康下降, 干旱风险' },
+  snowy:    { name:'雪天',   icon:'❄️', color:'#ecf0f1', effect:'移动-30%, 消耗增加' }
+};
+
+// 自然灾害
+let disasterActive = null;
+const DISASTERS = {
+  flood:    { name:'洪水',   icon:'🌊', damage:'摧毁农田和低地建筑', duration: 2 },
+  drought:  { name:'干旱',   icon:'🏜️', damage:'农田绝收, 水源减少', duration: 3 },
+  plague:   { name:'瘟疫',   icon:'🦠', damage:'人口健康下降, 死亡风险', duration: 4 },
+  earthquake:{name:'地震',   icon:'🌋', damage:'建筑损坏, 山石崩落', duration: 1 },
+  locust:   { name:'蝗灾',   icon:'🦗', damage:'农作物被啃食殆尽', duration: 2 }
+};
+
+let gameTime = 0;
+let year = 1;
+let month = 1;
+let currentEra = 0;
+
+let hero = { name:'轩辕氏', level:1, exp:0, expNext:100, hp:100, maxHp:100, mp:50, maxMp:50, atk:10, def:5 };
+
+let questState = { houseCount:0, farmCount:0, killCount:0, hasAltar:false, population:12 };
+let sideQuests = [
+  { id:'q1', name:'建造3座房屋', target:3, field:'houseCount', completed:false, reward:{money:10,exp:20} },
+  { id:'q2', name:'开垦5亩农田', target:5, field:'farmCount', completed:false, reward:{food:50,exp:20} },
+  { id:'q3', name:'狩猎3头野兽', target:3, field:'killCount', completed:false, reward:{exp:30,mood:5} },
+  { id:'q4', name:'建造祭坛', target:1, field:'hasAltar', completed:false, reward:{exp:50,mood:15} }
+];
+let mainQuestIndex = 0;
+const MAIN_QUESTS = [
+  { name:'任务一：安家落户', desc:'建造第一座房屋', check:()=>questState.houseCount>=1 },
+  { name:'任务二：丰衣足食', desc:'开垦5亩农田', check:()=>questState.farmCount>=5 },
+  { name:'任务三：初识科技', desc:'研究第一项科技', check:()=>hasAnyTech() },
+  { name:'任务四：建立武备', desc:'建造兵营', check:()=>buildingCount(T.BARRACKS)>=1 },
+  { name:'任务五：敬天法祖', desc:'建造祭坛', check:()=>questState.hasAltar },
+  { name:'任务六：人丁兴旺', desc:'人口达到20人', check:()=>questState.population>=20 },
+  { name:'第一章终：部落联盟', desc:'人口达到50，影响力500', check:()=>questState.population>=50 && resources.influence>=500 }
+];
+
+let techState = {};
+let currentResearch = null;
+let researchProgress = 0;
+
+let military = { warriors:0, archers:0, totalAtk:0, totalDef:0, maxTroops:5, mode:'idle' };
+
+let selectedPerson = null;
+let isDragging = false, dragStart = null;
+let lastMX = 0, lastMY = 0;
+
+let canvas, ctx, lastTime = 0, accum = 0;
+
+// ==================== 初始化 ====================
+function init() {
+  canvas = document.getElementById('game');
+  ctx = canvas.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  // 初始化科技状态
+  for (const t in TECHS) techState[t] = { researched: TECHS[t].researched, progress: 0 };
+
+  generateMap();
+  spawnInitialPeople();
+  spawnInitialMonsters();
+  setupEventListeners();
+
+  camera.x = MW*TS/2 - canvas.width/2;
+  camera.y = MH*TS/2 - canvas.height/2;
+
+  updateAllUI();
+  requestAnimationFrame(gameLoop);
+}
+
+function resizeCanvas() {
+  const w = document.getElementById('canvas-wrap');
+  canvas.width = w.clientWidth;
+  canvas.height = w.clientHeight;
+}
+
+function setupEventListeners() {
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('mouseleave', onMouseUp);
+  canvas.addEventListener('wheel', onWheel, { passive:false });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  window.addEventListener('keydown', onKeyDown);
+}
+
+// ==================== 地图生成 ====================
+function generateMap() {
+  for (let y = 0; y < MH; y++) {
+    map[y] = []; mapVar[y] = [];
+    for (let x = 0; x < MW; x++) {
+      const elev = noise(x*0.05, y*0.05, 1)*0.6 + noise(x*0.12, y*0.12, 2)*0.4;
+      const moist = noise(x*0.07, y*0.07, 3)*0.5 + noise(x*0.18, y*0.18, 4)*0.5;
+      const riverY = MH*0.48 + Math.sin(x*0.06)*6 + noise(x*0.09, 0, 5)*4;
+      const dRiver = Math.abs(y - riverY);
+
+      mapVar[y][x] = Math.floor(Math.random()*4);
+
+      if (dRiver < 2 + Math.random()*1.5) map[y][x] = T.WATER;
+      else if (elev > 0.78) map[y][x] = T.MOUNTAIN;
+      else if (elev > 0.62) {
+        const r = Math.random();
+        if (r > 0.94) map[y][x] = T.GOLD;
+        else if (r > 0.82) map[y][x] = T.COPPER;
+        else if (r > 0.68) map[y][x] = T.IRON;
+        else map[y][x] = T.STONE;
+      } else if (elev < 0.25 && moist > 0.5) map[y][x] = T.SAND;
+      else if (moist > 0.62 && elev < 0.5 && dRiver > 5) {
+        map[y][x] = Math.random() > 0.4 ? T.TREE : T.GRASS;
+      } else map[y][x] = T.GRASS;
+    }
+  }
+  // 中心空地
+  const cx = Math.floor(MW/2), cy = Math.floor(MH/2);
+  for (let y = cy-12; y < cy+12; y++)
+    for (let x = cx-15; x < cx+15; x++) {
+      if (x<0||x>=MW||y<0||y>=MH) continue;
+      const t = map[y][x];
+      if (t === T.WATER || t === T.MOUNTAIN) map[y][x] = T.GRASS;
+      if (t === T.TREE && Math.random() > 0.25) map[y][x] = T.GRASS;
+    }
+}
+
+function noise(x, y, seed) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const tl = rand(xi, yi, seed), tr = rand(xi+1, yi, seed);
+  const bl = rand(xi, yi+1, seed), br = rand(xi+1, yi+1, seed);
+  const u = xf*xf*(3-2*xf), v = yf*yf*(3-2*yf);
+  return tl*(1-u)*(1-v) + tr*u*(1-v) + bl*(1-u)*v + br*u*v;
+}
+function rand(x, y, s) {
+  const v = Math.sin(x*12.9898 + y*78.233 + s*37.719) * 43758.5453;
+  return v - Math.floor(v);
+}
+
+// ==================== 族人 ====================
+function spawnInitialPeople() {
+  const cx = MW/2, cy = MH/2;
+  // 基础族人
+  for (let i = 0; i < 8; i++) {
+    const sn = SURNAMES[Math.floor(Math.random()*SURNAMES.length)];
+    const gn = GNAMES[Math.floor(Math.random()*GNAMES.length)] + (Math.random()>0.5?GNAMES[Math.floor(Math.random()*GNAMES.length)]:'');
+    people.push(createPerson(sn+gn, cx+(Math.random()-0.5)*14, cy+(Math.random()-0.5)*10));
+  }
+  // 初始战士（3名）
+  for (let i = 0; i < 3; i++) {
+    const sn = SURNAMES[Math.floor(Math.random()*SURNAMES.length)];
+    const gn = GNAMES[Math.floor(Math.random()*GNAMES.length)];
+    const p = createPerson(sn+gn, cx+(Math.random()-0.5)*10, cy+(Math.random()-0.5)*8);
+    p.job = '战士';
+    p.atk = 6 + Math.random() * 4;
+    p.def = 2 + Math.random() * 2;
+    p.maxHp = 120;
+    p.hp = 120;
+    people.push(p);
+  }
+}
+
+function createPerson(name, x, y) {
+  const job = JOBS[Math.floor(Math.random()*8)];
+  const isWarrior = job === '战士' || job === '猎户';
+  return {
+    id: people.length, name, x, y,
+    hp: 100, maxHp: 100,
+    hunger: 100, thirst: 100,
+    happiness: 65+Math.random()*25, energy: 100,
+    job, level: 1, exp: 0, expNext: 100,
+    atk: 3+Math.random()*3 + (isWarrior?3:0),
+    def: 1+Math.random()*2 + (isWarrior?1:0),
+    age: 18+Math.floor(Math.random()*25),
+    gender: Math.random()>0.5?'男':'女',
+    state: 'idle', task: null, tx: x, ty: y,
+    workProgress: 0, attackCooldown: 0,
+    color: `hsl(${20+Math.random()*20},${50+Math.random()*25}%,${42+Math.random()*18}%)`,
+    walkPhase: Math.random()*Math.PI*2,
+    assignedTo: null // 'army' 等
+  };
+}
+
+function spawnNewPerson() {
+  const cx = MW/2, cy = MH/2;
+  const sn = SURNAMES[Math.floor(Math.random()*SURNAMES.length)];
+  const gn = GNAMES[Math.floor(Math.random()*GNAMES.length)];
+  const p = createPerson(sn+gn, cx+(Math.random()-0.5)*10, cy+(Math.random()-0.5)*8);
+  p.age = 16 + Math.floor(Math.random()*10);
+  p.hunger = 80; p.thirst = 80;
+  people.push(p);
+  return p;
+}
+
+// ==================== 怪物 ====================
+function spawnInitialMonsters() {
+  spawnMonster('wolf', 3);
+  spawnMonster('boar', 1);
+}
+function spawnMonster(type, count=1) {
+  const mt = MONSTER_TYPES[type];
+  if (!mt) return;
+  for (let i = 0; i < count; i++) {
+    let x, y, tries = 0;
+    do {
+      x = Math.floor(Math.random()*MW);
+      y = Math.floor(Math.random()*MH);
+      tries++;
+    } while ((!isWalkable(x,y) || dist(x,y,MW/2,MH/2)<18) && tries < 100);
+    monsters.push({
+      id: 'm_'+Date.now()+'_'+Math.random().toString(36).substr(2,5),
+      type, name: mt.name, icon: mt.icon,
+      hp: mt.hp, maxHp: mt.hp,
+      atk: mt.atk, def: mt.def, exp: mt.exp,
+      level: mt.level, color: mt.color,
+      mythical: mt.mythical || false,
+      x, y, targetX: x, targetY: y,
+      state: 'roaming', attackCooldown: 0,
+      fleeing: false, roamTimer: 0
+    });
+  }
+}
+
+// ==================== 游戏循环 ====================
+function gameLoop(ts) {
+  const dt = Math.min((ts-lastTime)/1000, 0.1);
+  lastTime = ts;
+  const sm = [0,1,3,8][gameSpeed];
+  const gdt = dt * sm;
+
+  if (gameSpeed > 0 && gameStarted) {
+    accum += gdt;
+    const tick = 0.1;
+    while (accum >= tick) {
+      updateGame(tick);
+      accum -= tick;
+    }
+    gameTime += gdt;
+
+    // 月份计算（每月10秒，每年12月）
+    const totalMonths = Math.floor(gameTime / 10) + 1;
+    const ny = Math.floor((totalMonths-1) / 12) + 1;
+    const nm = ((totalMonths-1) % 12) + 1;
+    if (nm !== month) {
+      month = nm;
+      onNewMonth();
+      if (month === 1 && ny !== year) {
+        year = ny;
+        onNewYear();
+      }
+    }
+  }
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+function updateCameraByMouse(dt) {
+  if (!gameStarted || !canvas) return;
+  const edgeSize = 40; // 边缘区域大小（像素）
+  const speed = 300 * dt / camera.zoom;
+  const w = canvas.width, h = canvas.height;
+  
+  let dx = 0, dy = 0;
+  if (lastMX < edgeSize) dx = -1;
+  else if (lastMX > w - edgeSize) dx = 1;
+  if (lastMY < edgeSize) dy = -1;
+  else if (lastMY > h - edgeSize) dy = 1;
+  
+  if (dx !== 0 || dy !== 0) {
+    camera.x += dx * speed;
+    camera.y += dy * speed;
+    // 限制相机范围
+    camera.x = Math.max(0, Math.min(MW*TS - w/camera.zoom, camera.x));
+    camera.y = Math.max(0, Math.min(MH*TS - h/camera.zoom, camera.y));
+  }
+}
+
+function updateGame(dt) {
+  updateCameraByMouse(dt);
+  updatePeople(dt);
+  updateMonsters(dt);
+  updateResearch(dt);
+  updateInfluence(dt);
+  updateMilitary(dt);
+  updateCombatEffects(dt);
+  updateWeather(dt);
+  updateDisaster(dt);
+  checkQuests();
+  updateUI();
+  jobs = jobs.filter(j => !j.done);
+}
+
+// ==================== 族人AI ====================
+function updatePeople(dt) {
+  for (const p of people) {
+    p.hunger -= dt * 0.25;
+    p.thirst -= dt * 0.4;
+    p.energy -= dt * 0.15;
+    if (p.hunger < 30 || p.thirst < 30) p.happiness -= dt * 0.25;
+    if (p.hunger <= 0 || p.thirst <= 0) p.hp -= dt * 1.2;
+    p.attackCooldown = Math.max(0, p.attackCooldown - dt);
+    p.walkPhase += dt * 8;
+
+    switch (p.state) {
+      case 'idle': findWork(p); break;
+      case 'moving': movePerson(p, dt); break;
+      case 'working': doWork(p, dt); break;
+      case 'fighting': doFight(p, dt); break;
+    }
+
+    if (p.hunger < 40 && p.state === 'idle' && resources.food > 0) {
+      resources.food -= 1;
+      p.hunger = Math.min(100, p.hunger + 60);
+      p.happiness = Math.min(100, p.happiness + 2);
+    }
+
+    p.hp = Math.max(0, Math.min(p.maxHp, p.hp));
+    p.hunger = Math.max(0, Math.min(100, p.hunger));
+    p.thirst = Math.max(0, Math.min(100, p.thirst));
+    p.happiness = Math.max(0, Math.min(100, p.happiness));
+    p.energy = Math.max(0, Math.min(100, p.energy));
+  }
+
+  const dead = people.filter(p => p.hp <= 0);
+  for (const p of dead) {
+    addLog(`💀 ${p.name} 去世了。`, 'warn');
+    notify(`${p.name} 不幸去世`, 'combat');
+    if (p.task) { p.task.assigned = false; p.task.assignee = null; }
+  }
+  people = people.filter(p => p.hp > 0);
+}
+
+function findWork(p) {
+  // 战士优先战斗
+  if ((p.job === '战士' || p.job === '猎户') && military.mode !== 'defend') {
+    for (const m of monsters) {
+      if (m.hp <= 0 || m.fleeing) continue;
+      const d = dist(p.x, p.y, m.x, m.y);
+      if (d < 8) {
+        p.task = { type:'fight', monster:m };
+        p.tx = m.x; p.ty = m.y;
+        p.state = 'moving';
+        return;
+      }
+    }
+  }
+
+  // 防守模式在基地巡逻
+  if (military.mode === 'defend' && (p.job === '战士' || p.job === '猎户')) {
+    if (Math.random() < 0.03) {
+      p.tx = MW/2 + (Math.random()-0.5)*15;
+      p.ty = MH/2 + (Math.random()-0.5)*15;
+      p.tx = Math.max(5, Math.min(MW-5, p.tx));
+      p.ty = Math.max(5, Math.min(MH-5, p.ty));
+      p.state = 'moving'; p.task = null;
+      return;
+    }
+    return;
+  }
+
+  // 工作任务
+  for (const j of jobs) {
+    if (j.assigned || j.done) continue;
+    const isMatch = (j.type==='chop' && (p.job==='樵夫'||p.job==='工匠')) ||
+                    (j.type==='mine' && (p.job==='石匠'||p.job==='矿工')) ||
+                    (j.type==='hunt' && p.job==='猎户');
+    if (!isMatch && Math.random() > 0.3) continue;
+    j.assigned = true; j.assignee = p.id;
+    p.task = j; p.tx = j.x; p.ty = j.y;
+    p.state = 'moving';
+    return;
+  }
+
+  if (Math.random() < 0.02) {
+    p.tx = p.x + (Math.random()-0.5)*12;
+    p.ty = p.y + (Math.random()-0.5)*12;
+    p.tx = Math.max(5, Math.min(MW-5, p.tx));
+    p.ty = Math.max(5, Math.min(MH-5, p.ty));
+    p.state = 'moving'; p.task = null;
+  }
+}
+
+function movePerson(p, dt) {
+  const dx = p.tx - p.x, dy = p.ty - p.y;
+  const d = Math.sqrt(dx*dx + dy*dy);
+  if (d < 0.15) {
+    p.x = p.tx; p.y = p.ty;
+    if (p.task) {
+      if (p.task.type === 'fight') p.state = 'fighting';
+      else { p.state = 'working'; p.workProgress = 0; }
+    } else p.state = 'idle';
+    return;
+  }
+  const speed = 2.2 * dt;
+  const mx = dx/d * speed, my = dy/d * speed;
+  const nx = p.x + mx, ny = p.y + my;
+  if (isWalkable(Math.floor(nx), Math.floor(ny))) { p.x = nx; p.y = ny; }
+  else if (isWalkable(Math.floor(nx), Math.floor(p.y))) p.x = nx;
+  else if (isWalkable(Math.floor(p.x), Math.floor(ny))) p.y = ny;
+  else {
+    p.state = 'idle';
+    if (p.task) { p.task.assigned = false; p.task.assignee = null; p.task = null; }
+  }
+}
+
+function isWalkable(x, y) {
+  if (x<0||x>=MW||y<0||y>=MH) return false;
+  const t = map[y][x];
+  return t===T.GRASS||t===T.DIRT||t===T.SAND||t===T.ROAD||t===T.FLOOR||t===T.FARM||
+         t===T.HOUSE||t===T.FARM_HUT||t===T.WORKSHOP||t===T.STORAGE||t===T.WELL||
+         t===T.ALTAR||t===T.SCHOOL||t===T.LIBRARY||t===T.BARRACKS||t===T.ARCHERY;
+}
+
+function doWork(p, dt) {
+  if (!p.task) { p.state = 'idle'; return; }
+  const j = p.task;
+  p.workProgress += dt * 18;
+  p.energy -= dt * 0.4;
+  if (p.workProgress >= 100) {
+    completeJob(j, p);
+    p.state = 'idle'; p.task = null; p.workProgress = 0;
+    gainExp(p, 2);
+    resources.knowledge += 0.1; // 工作中积累学识
+  }
+}
+
+function completeJob(j, p) {
+  j.done = true;
+  if (j.type === 'chop' && map[j.y][j.x] === T.TREE) {
+    map[j.y][j.x] = T.GRASS;
+    let amt = 3 + Math.floor(Math.random()*3);
+    if (techState.stone_tools?.researched) amt = Math.floor(amt * 1.2);
+    resources.wood += amt;
+  } else if (j.type === 'mine') {
+    const t = map[j.y][j.x];
+    let stoneAmt = 2 + Math.floor(Math.random()*2);
+    if (techState.stone_tools?.researched) stoneAmt = Math.floor(stoneAmt * 1.2);
+    if (t === T.STONE || t === T.MOUNTAIN) resources.stone += stoneAmt;
+    else if (t === T.COPPER) { resources.stone += 1; resources.bronze += 1; addLog('⛏️ 发现了铜矿石！', 'good'); }
+    else if (t === T.GOLD) { resources.money += 5; addLog('✨ 挖出了黄金！', 'good'); notify('发现黄金！', 'good'); }
+    else if (t === T.IRON) resources.stone += 1;
+    if (t !== T.GRASS && t !== T.DIRT) map[j.y][j.x] = T.DIRT;
+  }
+}
+
+function gainExp(p, amt) {
+  p.exp += amt;
+  while (p.exp >= p.expNext) {
+    p.exp -= p.expNext;
+    p.level++;
+    p.maxHp += 10; p.hp = p.maxHp;
+    p.atk += 2; p.def += 1;
+    p.expNext = Math.floor(p.expNext * 1.4);
+    addLog(`⬆️ ${p.name} 升级到 Lv.${p.level}！`, 'good');
+    notify(`${p.name} 达到 Lv.${p.level}`, 'good');
+  }
+}
+
+// ==================== 怪物AI ====================
+function updateMonsters(dt) {
+  for (const m of monsters) {
+    if (m.hp <= 0) continue;
+    m.attackCooldown = Math.max(0, m.attackCooldown - dt);
+    m.roamTimer -= dt;
+
+    let nearest = null, minD = m.fleeing ? 15 : 8;
+    for (const p of people) {
+      const d = dist(m.x, m.y, p.x, p.y);
+      if (d < minD) { minD = d; nearest = p; }
+    }
+
+    if (m.fleeing) {
+      const dx = m.x - MW/2, dy = m.y - MH/2;
+      const d = Math.sqrt(dx*dx+dy*dy) || 1;
+      m.x += dx/d * 2.5 * dt;
+      m.y += dy/d * 2.5 * dt;
+      if (d > 45) m.hp = 0;
+      continue;
+    }
+
+    if (nearest && m.hp > m.maxHp * 0.25) {
+      m.state = 'chasing';
+      const dx = nearest.x - m.x, dy = nearest.y - m.y;
+      const d = Math.sqrt(dx*dx+dy*dy);
+      if (d < 1.2) {
+        if (m.attackCooldown <= 0) {
+          const dmg = Math.max(1, m.atk - nearest.def + Math.floor(Math.random()*3) - 1);
+          nearest.hp -= dmg;
+          nearest.happiness -= 8;
+          m.attackCooldown = 1.2;
+          addCombatText(nearest.x, nearest.y, `-${dmg}`, '#e74c3c');
+          if (nearest.hp <= 0) {
+            addLog(`💀 ${nearest.name} 被 ${m.name} 杀死了！`, 'combat');
+            notify(`${nearest.name} 遇害！`, 'combat');
+          }
+        }
+      } else {
+        const sp = 1.8 * dt;
+        const nx = m.x + dx/d * sp, ny = m.y + dy/d * sp;
+        if (isWalkable(Math.floor(nx), Math.floor(ny))) { m.x = nx; m.y = ny; }
+      }
+    } else {
+      m.state = 'roaming';
+      if (m.roamTimer <= 0 || dist(m.x, m.y, m.targetX, m.targetY) < 0.5) {
+        m.targetX = m.x + (Math.random()-0.5)*10;
+        m.targetY = m.y + (Math.random()-0.5)*10;
+        m.targetX = Math.max(3, Math.min(MW-3, m.targetX));
+        m.targetY = Math.max(3, Math.min(MH-3, m.targetY));
+        m.roamTimer = 3 + Math.random()*5;
+      }
+      const dx = m.targetX - m.x, dy = m.targetY - m.y;
+      const d = Math.sqrt(dx*dx+dy*dy);
+      if (d > 0.3) {
+        const sp = 0.7 * dt;
+        const nx = m.x + dx/d * sp, ny = m.y + dy/d * sp;
+        if (isWalkable(Math.floor(nx), Math.floor(ny))) { m.x = nx; m.y = ny; }
+        else m.roamTimer = 0;
+      }
+    }
+    if (m.hp <= m.maxHp * 0.25 && !m.fleeing) m.fleeing = true;
+  }
+  monsters = monsters.filter(m => m.hp > 0);
+  if (monsters.length < 4 && Math.random() < 0.003) {
+    const types = ['wolf','wolf','boar','snake'];
+    spawnMonster(types[Math.floor(Math.random()*types.length)], 1);
+  }
+}
+
+function doFight(p, dt) {
+  if (!p.task || !p.task.monster || p.task.monster.hp <= 0) {
+    p.state = 'idle'; p.task = null; return;
+  }
+  const m = p.task.monster;
+  const d = dist(p.x, p.y, m.x, m.y);
+  if (d > 1.5) {
+    p.tx = m.x; p.ty = m.y;
+    movePerson(p, dt);
+    return;
+  }
+  if (p.attackCooldown <= 0) {
+    let dmg = Math.max(1, Math.floor(p.atk - m.def + Math.random()*4));
+    if (techState.basic_weapons?.researched) dmg += 2;
+    if (techState.bronze_weapons?.researched) dmg = Math.floor(dmg * 1.5);
+    if (techState.tactics?.researched) dmg = Math.floor(dmg * 1.2);
+    m.hp -= dmg;
+    p.attackCooldown = 1;
+    addCombatText(m.x, m.y, `-${dmg}`, '#ff6b6b');
+    if (m.hp <= 0) {
+      addLog(`⚔️ ${p.name} 击杀了 ${m.name}！+${m.exp}经验`, 'combat');
+      notify(`击杀 ${m.name}！+${m.exp}经验`, 'combat');
+      gainExp(p, m.exp);
+      hero.exp += Math.floor(m.exp / 2);
+      checkHeroLevelUp();
+      resources.food += 3 + Math.floor(Math.random()*5);
+      questState.killCount++;
+      resources.influence += 5;
+      p.state = 'idle'; p.task = null;
+      if (m.mythical) {
+        addLog(`🌟 传说中的${m.name}竟真的存在...`, 'myth');
+        notify('神话生物现身！', 'myth');
+        resources.influence += 50;
+      }
+      addBattleLog(`${p.name} 击杀 ${m.name}`);
+    }
+  }
+}
+
+// ==================== 科技系统 ====================
+function updateResearch(dt) {
+  // 学识产出
+  let knowledgeRate = 0.1; // 基础
+  if (techState.oral_tradition?.researched) knowledgeRate *= 1.2;
+  if (techState.writing?.researched) knowledgeRate *= 2;
+  knowledgeRate += buildingCount(T.SCHOOL) * 0.5;
+  knowledgeRate += buildingCount(T.LIBRARY) * 1;
+  resources.knowledge += knowledgeRate * dt;
+
+  // 研究进度
+  if (currentResearch) {
+    const tech = TECHS[currentResearch];
+    researchProgress += knowledgeRate * dt;
+    if (researchProgress >= tech.cost) {
+      techState[currentResearch].researched = true;
+      techState[currentResearch].progress = tech.cost;
+      addLog(`📚 研究完成：${tech.name}！`, 'quest');
+      notify(`科技解锁：${tech.name}`, 'quest');
+      resources.influence += 20;
+      hero.exp += 15;
+      checkHeroLevelUp();
+      
+      // 检查时代跨越（必须在清除currentResearch之前）
+      const completedTech = currentResearch;
+      currentResearch = null;
+      researchProgress = 0;
+      
+      if (completedTech === 'bronze_smelting') enterBronzeAge();
+    } else {
+      techState[currentResearch].progress = researchProgress;
+    }
+  }
+}
+
+function researchTech(id) {
+  if (!TECHS[id]) return;
+  const t = TECHS[id];
+  if (techState[id]?.researched) return;
+  if (t.era > currentEra) {
+    notify('需要先进入更高时代', 'combat');
+    return;
+  }
+  if (currentResearch) {
+    notify('已有正在研究的科技', 'warn');
+    return;
+  }
+  currentResearch = id;
+  researchProgress = 0;
+  addLog(`📚 开始研究：${t.name}`, 'quest');
+  notify(`开始研究：${t.name}`, 'quest');
+  updateTechUI();
+}
+
+function hasAnyTech() {
+  for (const t in techState) {
+    if (techState[t].researched && t !== 'fire') return true;
+  }
+  return false;
+}
+
+function enterBronzeAge() {
+  currentEra = 1;
+  addLog('🏛️ 进入青铜时代！', 'quest');
+  notify('青铜时代到来！', 'quest');
+  document.getElementById('chapter-badge').textContent = '第二章 · 青铜华章';
+  // 解锁更多科技
+  techState.bronze_smelting = techState.bronze_smelting || { researched: true, progress: 0 };
+}
+
+// ==================== 势力范围 ====================
+function updateInfluence(dt) {
+  // 建筑提供影响力
+  let inflow = 0;
+  const buildings = buildingCounts();
+  for (const b in buildings) {
+    const bd = BUILDINGS[b];
+    if (bd && bd.influence) inflow += buildings[b] * bd.influence * 0.01;
+  }
+  inflow += questState.population * 0.005;
+  resources.influence += inflow * dt;
+  resources.influence = Math.max(0, resources.influence);
+}
+
+function buildingCount(tileType) {
+  let c = 0;
+  for (let y = 0; y < MH; y++)
+    for (let x = 0; x < MW; x++)
+      if (map[y][x] === tileType) c++;
+  return c;
+}
+
+function buildingCounts() {
+  const counts = {};
+  const tileToKey = {};
+  for (const k in BUILDINGS) tileToKey[BUILDINGS[k].tile] = k;
+  for (let y = 0; y < MH; y++)
+    for (let x = 0; x < MW; x++) {
+      const t = map[y][x];
+      const k = tileToKey[t];
+      if (k) counts[k] = (counts[k] || 0) + 1;
+    }
+  return counts;
+}
+
+// ==================== 军事系统 ====================
+function updateMilitary(dt) {
+  // 统计战士
+  let w = 0, a = 0, atk = 0, def = 0;
+  for (const p of people) {
+    if (p.job === '战士') { w++; atk += p.atk; def += p.def; }
+    if (p.job === '猎户' && techState.archery_tech?.researched) { a++; atk += p.atk * 0.8; def += p.def * 0.5; }
+  }
+  military.warriors = w;
+  military.archers = a;
+  military.totalAtk = Math.floor(atk);
+  military.totalDef = Math.floor(def);
+  military.maxTroops = 5 + buildingCount(T.BARRACKS) * 5 + buildingCount(T.ARCHERY) * 3;
+}
+
+// ==================== 天气系统 ====================
+let weatherTimer = 0;
+
+function updateWeather(dt) {
+  weatherTimer -= dt;
+  if (weatherTimer <= 0) {
+    changeWeather();
+  }
+  
+  // 天气对人物的影响
+  for (const p of people) {
+    if (weather.type === 'hot') {
+      p.thirst -= dt * 0.3; // 酷暑口渴更快
+    }
+    if (weather.type === 'snowy') {
+      p.hunger -= dt * 0.15; // 雪天消耗更多
+    }
+  }
+}
+
+function changeWeather() {
+  const types = ['sunny', 'sunny', 'sunny', 'cloudy', 'cloudy', 'rainy', 'hot', 'snowy', 'storm'];
+  const newType = types[Math.floor(Math.random() * types.length)];
+  
+  if (newType !== weather.type) {
+    weather.type = newType;
+    const wt = WEATHER_TYPES[newType];
+    addLog(`${wt.icon} 天气变化：${wt.name}`, 'quest');
+  }
+  
+  weatherTimer = 15 + Math.random() * 25; // 每个天气持续15-40秒
+  weather.intensity = 0.5 + Math.random() * 0.5;
+}
+
+// 获取天气对生产的影响系数
+function getWeatherProductionMod() {
+  switch(weather.type) {
+    case 'sunny':  return 1.0;
+    case 'cloudy': return 0.9;
+    case 'rainy':  return 0.85;
+    case 'storm':  return 0.6;
+    case 'hot':    return 0.8;
+    case 'snowy':  return 0.65;
+    default:       return 1.0;
+  }
+}
+
+// ==================== 自然灾害系统 ====================
+let disasterTimer = 0;
+let disasterDuration = 0;
+
+function updateDisaster(dt) {
+  if (disasterActive) {
+    disasterDuration -= dt;
+    
+    // 持续灾害效果
+    if (disasterActive === 'plague') {
+      for (const p of people) {
+        if (Math.random() < 0.002 * dt) {
+          p.hp -= 5;
+          p.happiness -= 3;
+        }
+      }
+    }
+    if (disasterActive === 'drought') {
+      // 干旱减少水资源影响健康
+      for (const p of people) {
+        if (Math.random() < 0.001 * dt) {
+          p.thirst -= 5;
+        }
+      }
+    }
+    
+    if (disasterDuration <= 0) {
+      endDisaster();
+    }
+    return;
+  }
+  
+  disasterTimer -= dt;
+  if (disasterTimer <= 0) {
+    // 随机触发灾害（低概率）
+    if (Math.random() < 0.15 && year > 2) {
+      triggerRandomDisaster();
+    }
+    disasterTimer = 60 + Math.random() * 60; // 每60-120秒检查一次
+  }
+}
+
+function triggerRandomDisaster() {
+  const disasters = [];
+  
+  // 根据天气增加特定灾害概率
+  if (weather.type === 'storm' || weather.type === 'rainy') {
+    disasters.push('flood', 'flood');
+  }
+  if (weather.type === 'hot') {
+    disasters.push('drought', 'drought');
+  }
+  
+  disasters.push('plague', 'earthquake', 'locust');
+  
+  const type = disasters[Math.floor(Math.random() * disasters.length)];
+  startDisaster(type);
+}
+
+function startDisaster(type) {
+  const d = DISASTERS[type];
+  if (!d) return;
+  
+  disasterActive = type;
+  disasterDuration = d.duration * 10; // 持续时间
+  
+  addLog(`⚠️ ${d.icon} ${d.name}来袭！${d.damage}`, 'combat');
+  notify(`${d.name}来袭！`, 'combat');
+  
+  // 立即造成的影响
+  switch(type) {
+    case 'flood':
+      applyFloodDamage();
+      break;
+    case 'drought':
+      addLog('🏜️ 水源减少，农田产量下降...', 'combat');
+      break;
+    case 'plague':
+      addLog('🦠 瘟疫蔓延，族人健康急剧下降！', 'combat');
+      break;
+    case 'earthquake':
+      applyEarthquakeDamage();
+      break;
+    case 'locust':
+      applyLocustDamage();
+      break;
+  }
+}
+
+function endDisaster() {
+  if (!disasterActive) return;
+  const d = DISASTERS[disasterActive];
+  addLog(`🌤️ ${d.name}终于过去了...`, 'good');
+  notify(`${d.name}结束`, 'good');
+  disasterActive = null;
+}
+
+function applyFloodDamage() {
+  // 摧毁部分农田和低地建筑
+  let destroyed = 0;
+  const cx = MW/2, cy = MH/2;
+  for (let y = 0; y < MH; y++) {
+    for (let x = 0; x < MW; x++) {
+      const d = dist(x, y, cx, cy);
+      if (d < territoryRadius && map[y][x] === T.FARM && Math.random() < 0.4) {
+        map[y][x] = T.DIRT;
+        destroyed++;
+      }
+    }
+  }
+  if (destroyed > 0) {
+    addLog(`🌊 洪水摧毁了${destroyed}亩农田！`, 'combat');
+    questState.farmCount = Math.max(0, questState.farmCount - destroyed);
+  }
+  // 粮食损失
+  const foodLoss = Math.floor(resources.food * 0.2);
+  resources.food = Math.max(0, resources.food - foodLoss);
+  if (foodLoss > 0) addLog(`🌊 洪水冲走了${foodLoss}粮食！`, 'combat');
+}
+
+function applyEarthquakeDamage() {
+  let damaged = 0;
+  const cx = MW/2, cy = MH/2;
+  for (let y = 0; y < MH; y++) {
+    for (let x = 0; x < MW; x++) {
+      const d = dist(x, y, cx, cy);
+      if (d < territoryRadius * 0.7) {
+        const t = map[y][x];
+        if ((t === T.HOUSE || t === T.WORKSHOP || t === T.STORAGE) && Math.random() < 0.2) {
+          map[y][x] = T.DIRT;
+          damaged++;
+        }
+      }
+    }
+  }
+  if (damaged > 0) {
+    addLog(`🌋 地震损坏了${damaged}座建筑！`, 'combat');
+  }
+}
+
+function applyLocustDamage() {
+  let destroyed = 0;
+  const cx = MW/2, cy = MH/2;
+  for (let y = 0; y < MH; y++) {
+    for (let x = 0; x < MW; x++) {
+      const d = dist(x, y, cx, cy);
+      if (d < territoryRadius * 1.2 && map[y][x] === T.FARM && Math.random() < 0.6) {
+        map[y][x] = T.DIRT;
+        destroyed++;
+      }
+    }
+  }
+  if (destroyed > 0) {
+    addLog(`🦗 蝗虫啃食了${destroyed}亩农田！`, 'combat');
+    questState.farmCount = Math.max(0, questState.farmCount - destroyed);
+  }
+}
+
+// ==================== 领地UI ====================
+function updateTerritoryUI() {
+  const levelInfo = TERRITORY_LEVELS[territoryLevel - 1];
+  const nextInfo = TERRITORY_LEVELS[territoryLevel] || null;
+  
+  const territoryLevelEl = document.getElementById('territory-level');
+  const territoryRadiusEl = document.getElementById('territory-radius');
+  const territoryNameEl = document.getElementById('territory-name');
+  
+  if (territoryLevelEl) territoryLevelEl.textContent = `Lv.${territoryLevel} ${levelInfo.name}`;
+  if (territoryRadiusEl) territoryRadiusEl.textContent = `${territoryRadius} 格`;
+  if (territoryNameEl) territoryNameEl.textContent = levelInfo.name;
+  
+  // 更新升级按钮
+  const upgradeBtn = document.getElementById('upgrade-territory-btn');
+  if (upgradeBtn && nextInfo) {
+    upgradeBtn.textContent = `🏛️ 升级领地 (${nextInfo.cost}影响力)`;
+    upgradeBtn.disabled = resources.influence < nextInfo.cost;
+    upgradeBtn.style.opacity = resources.influence < nextInfo.cost ? 0.5 : 1;
+  } else if (upgradeBtn) {
+    upgradeBtn.textContent = '🏛️ 已满级';
+    upgradeBtn.disabled = true;
+    upgradeBtn.style.opacity = 0.5;
+  }
+}
+
+function startAttackMode() {
+  attackMode = true;
+  setTool('attack');
+  document.getElementById('mode-indicator').classList.add('active');
+  addLog('⚔️ 进入攻击模式，点击目标位置出征。', 'military');
+}
+
+function defendMode() {
+  military.mode = 'defend';
+  attackMode = false;
+  document.getElementById('mode-indicator').classList.remove('active');
+  addLog('🛡️ 全员进入防守状态。', 'military');
+  notify('全员防守', 'military');
+  setTool('inspect');
+}
+
+function patrolMode() {
+  military.mode = 'idle';
+  addLog('🚶 部队恢复巡逻警戒。', 'military');
+  notify('巡逻警戒', 'good');
+}
+
+function attackAt(tx, ty) {
+  // 计算可用部队
+  const availableWarriors = [];
+  for (const p of people) {
+    if (p.job === '战士' || (p.job === '猎户' && techState.archery_tech?.researched)) {
+      if (p.state !== 'fighting' && p.hp > 20) {
+        availableWarriors.push(p);
+      }
+    }
+  }
+  
+  const count = Math.min(availableWarriors.length, military.maxTroops);
+  if (count === 0) {
+    notify('没有可用的战士！建造兵营并分配战士职业', 'combat');
+    return;
+  }
+
+  // 查找目标（优先找最近的敌人）
+  let target = null, minD = 15;
+  for (const m of monsters) {
+    if (m.hp <= 0) continue;
+    const d = dist(tx, ty, m.x, m.y);
+    if (d < minD) { minD = d; target = m; }
+  }
+
+  if (target) {
+    addLog(`⚔️ 派出 ${count} 名战士讨伐 ${target.name}！`, 'military');
+    notify(`出征讨伐 ${target.name}`, 'military');
+    
+    // 按距离排序，派最近的战士去
+    availableWarriors.sort((a, b) => 
+      dist(a.x, a.y, target.x, target.y) - dist(b.x, b.y, target.x, target.y)
+    );
+    
+    let sent = 0;
+    for (const p of availableWarriors) {
+      if (sent >= count) break;
+      p.task = { type: 'fight', monster: target };
+      p.tx = target.x + (Math.random()-0.5)*3;
+      p.ty = target.y + (Math.random()-0.5)*3;
+      p.state = 'moving';
+      sent++;
+    }
+    addBattleLog(`出征讨伐 ${target.name}（${count}人）`);
+    
+    // 添加战斗特效
+    addCombatText(target.x, target.y, '⚔️ 出征!', '#f39c12');
+  } else {
+    notify('附近没有发现敌人', 'warn');
+    addLog('⚠️ 出征失败：目标区域没有发现敌人', 'military');
+  }
+
+  attackMode = false;
+  document.getElementById('mode-indicator').classList.remove('active');
+  setTool('inspect');
+}
+
+function addBattleLog(msg) {
+  const log = document.getElementById('battle-log');
+  const entry = document.createElement('div');
+  entry.style.cssText = 'padding:3px 0;border-bottom:1px solid rgba(231,76,60,0.1);';
+  entry.innerHTML = `<span style="color:#5a6a80;font-size:10px;">第${year}年</span> ${msg}`;
+  if (log.firstChild?.textContent?.includes('暂无')) log.innerHTML = '';
+  log.insertBefore(entry, log.firstChild);
+}
+
+function addCombatText(x, y, text, color) {
+  combatEffects.push({
+    x, y, text, color,
+    life: 1.5,
+    maxLife: 1.5,
+    vy: -1.5
+  });
+}
+
+function updateCombatEffects(dt) {
+  for (const e of combatEffects) {
+    e.life -= dt;
+    e.y += e.vy * dt;
+    e.vy += 0.5 * dt;
+  }
+  combatEffects = combatEffects.filter(e => e.life > 0);
+}
+
+function drawCombatEffects() {
+  ctx.save();
+  ctx.font = 'bold 14px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  for (const e of combatEffects) {
+    const alpha = Math.min(1, e.life / e.maxLife * 1.5);
+    const px = e.x * TS - camera.x + TS/2;
+    const py = e.y * TS - camera.y;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillText(e.text, px + 1, py + 1);
+    ctx.fillStyle = e.color;
+    ctx.fillText(e.text, px, py);
+  }
+  ctx.restore();
+}
+
+function diplomacy(type) {
+  const factionId = selectedFaction || 'shennong';
+  const faction = FACTIONS.find(f => f.id === factionId);
+  if (!faction) {
+    notify('请先选择一个势力', 'warn');
+    return;
+  }
+  
+  if (type === 'trade') {
+    if (resources.food < 50) {
+      notify('粮食不足，无法通商（需50粮食）', 'combat');
+      return;
+    }
+    resources.food -= 50;
+    const gain = 20 + Math.floor(Math.random() * 30);
+    resources.wood += gain;
+    resources.stone += Math.floor(gain * 0.5);
+    faction.rel = faction.rel === 'hostile' ? 'neutral' : 'friendly';
+    addLog(`🤝 与${faction.name}通商成功，获得木材${gain}、石料${Math.floor(gain*0.5)}`, 'military');
+    notify(`与${faction.name}通商成功`, 'good');
+    resources.influence += 10;
+    
+  } else if (type === 'alliance') {
+    if (faction.rel === 'hostile') {
+      notify(`${faction.name}与我们敌对，无法结盟`, 'combat');
+      return;
+    }
+    if (resources.influence < 100) {
+      notify('影响力不足，无法提议结盟（需100影响力）', 'combat');
+      return;
+    }
+    resources.influence -= 100;
+    faction.rel = 'allied';
+    addLog(`🤜🤛 与${faction.name}结为盟友！`, 'quest');
+    notify(`与${faction.name}结盟`, 'quest');
+    resources.influence += 50;
+    
+  } else if (type === 'declare_war') {
+    if (faction.rel === 'allied') {
+      notify('不能对盟友宣战！', 'warn');
+      return;
+    }
+    faction.rel = 'hostile';
+    addLog(`⚔️ 向${faction.name}宣战！`, 'military');
+    notify(`向${faction.name}宣战`, 'combat');
+    // 敌人会开始袭击
+    spawnRaid(faction);
+  }
+  
+  updateFactionUI();
+}
+
+let selectedFaction = null;
+
+function selectFaction(id) {
+  selectedFaction = id;
+  updateFactionUI();
+}
+
+function spawnRaid(faction) {
+  // 生成一支袭击部队
+  const raidSize = Math.min(5, Math.floor(faction.power / 40));
+  addLog(`⚠️ ${faction.name}派来了${raidSize}名战士袭击我们！`, 'combat');
+  notify(`${faction.name}来袭！`, 'combat');
+  
+  for (let i = 0; i < raidSize; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 30 + Math.random() * 10;
+    const mx = Math.floor(MW/2 + Math.cos(angle) * dist);
+    const my = Math.floor(MH/2 + Math.sin(angle) * dist);
+    monsters.push({
+      id: Date.now() + i,
+      name: `${faction.name}战士`,
+      icon: '⚔️',
+      x: mx, y: my,
+      hp: 30 + faction.power * 0.2,
+      maxHp: 30 + faction.power * 0.2,
+      atk: 6 + faction.power * 0.05,
+      def: 2,
+      exp: 20,
+      color: '#8b0000',
+      level: Math.floor(faction.power / 30),
+      raider: true,
+      faction: faction.id
+    });
+  }
+}
+
+function updateFactionUI() {
+  const list = document.getElementById('faction-list');
+  if (!list) return;
+  
+  list.innerHTML = '';
+  for (const f of FACTIONS) {
+    const relText = { friendly:'友好', neutral:'中立', hostile:'敌对', allied:'同盟' }[f.rel] || '中立';
+    const relClass = f.rel;
+    const item = document.createElement('div');
+    item.className = `faction-item ${relClass}` + (selectedFaction === f.id ? ' selected' : '');
+    item.onclick = () => selectFaction(f.id);
+    item.innerHTML = `
+      <div class="faction-head">
+        <span class="faction-name">${f.icon} ${f.name}</span>
+        <span class="faction-rel ${relClass}">${relText}</span>
+      </div>
+      <div class="faction-info">${f.desc} · ${f.dir}</div>
+      <div class="faction-power">实力: ${f.power}</div>
+    `;
+    list.appendChild(item);
+  }
+}
+
+// ==================== 建造系统 ====================
+function canAfford(type) {
+  const b = BUILDINGS[type];
+  if (!b) return false;
+  for (const r in b.cost) if (resources[r] < b.cost[r]) return false;
+  return true;
+}
+
+function doBuild(x, y, type) {
+  const b = BUILDINGS[type];
+  if (!b || !canAfford(type)) return false;
+  
+  // 领地检查（围墙和哨塔可以建在领地边界外1格）
+  const distFromCenter = dist(x, y, MW/2, MH/2);
+  const buildLimit = territoryRadius + (type==='wall'||type==='watchtower' ? 2 : 0);
+  if (distFromCenter > buildLimit) {
+    notify('超出领地范围，无法建造', 'warn');
+    return false;
+  }
+  
+  const t = map[y][x];
+  const buildable = t===T.GRASS||t===T.DIRT||t===T.SAND||t===T.ROAD||t===T.FLOOR;
+  if (!buildable) return false;
+
+  // 科技检查
+  if (b.tech && !techState[b.tech]?.researched) return false;
+
+  for (const r in b.cost) resources[r] -= b.cost[r];
+  map[y][x] = b.tile;
+
+  if (type === 'house') questState.houseCount++;
+  if (type === 'altar') questState.hasAltar = true;
+  if (b.influence) resources.influence += b.influence;
+
+  addLog(`🏗️ 建造了${b.name}。`);
+  return true;
+}
+
+function doFarm(x, y) {
+  // 领地检查
+  const distFromCenter = dist(x, y, MW/2, MH/2);
+  if (distFromCenter > territoryRadius + 3) {
+    return false;
+  }
+  const t = map[y][x];
+  if (t !== T.GRASS && t !== T.DIRT) return false;
+  map[y][x] = T.FARM;
+  questState.farmCount++;
+  return true;
+}
+
+// 检查是否在领地内
+function isInTerritory(x, y) {
+  return dist(x, y, MW/2, MH/2) <= territoryRadius;
+}
+
+// 升级领地
+function upgradeTerritory() {
+  if (territoryLevel >= TERRITORY_LEVELS.length) {
+    notify('已达最高领地等级', 'warn');
+    return;
+  }
+  const next = TERRITORY_LEVELS[territoryLevel];
+  if (resources.influence < next.cost) {
+    notify(`影响力不足（需要${next.cost}）`, 'combat');
+    return;
+  }
+  resources.influence -= next.cost;
+  territoryLevel++;
+  territoryRadius = next.radius;
+  addLog(`🏛️ 领地升级为「${next.name}」！范围扩大到${next.radius}格。`, 'quest');
+  notify(`领地升级：${next.name}`, 'quest');
+  updateTerritoryUI();
+}
+
+function addJob(type, x, y) {
+  for (const j of jobs) if (j.x===x && j.y===y && j.type===type) return false;
+  jobs.push({ type, x, y, assigned:false, assignee:null, done:false });
+  return true;
+}
+
+// ==================== 任务系统 ====================
+function checkQuests() {
+  questState.population = people.length;
+
+  if (mainQuestIndex < MAIN_QUESTS.length) {
+    const mq = MAIN_QUESTS[mainQuestIndex];
+    if (mq.check()) {
+      addLog(`✅ 完成：${mq.name}`, 'quest');
+      notify(`任务完成：${mq.name}`, 'quest');
+      hero.exp += 30;
+      checkHeroLevelUp();
+      mainQuestIndex++;
+    }
+  }
+
+  for (const q of sideQuests) {
+    if (q.completed) continue;
+    const val = questState[q.field];
+    const cur = typeof val === 'boolean' ? (val ? 1 : 0) : val;
+    if (cur >= q.target) {
+      q.completed = true;
+      addLog(`🎁 支线完成：${q.name}`, 'quest');
+      notify(`支线完成：${q.name}`, 'quest');
+      if (q.reward) {
+        if (q.reward.food) resources.food += q.reward.food;
+        if (q.reward.money) resources.money += q.reward.money;
+        if (q.reward.mood) resources.mood = Math.min(100, resources.mood + q.reward.mood);
+        if (q.reward.exp) { hero.exp += q.reward.exp; checkHeroLevelUp(); }
+      }
+    }
+  }
+}
+
+function checkHeroLevelUp() {
+  while (hero.exp >= hero.expNext) {
+    hero.exp -= hero.expNext;
+    hero.level++;
+    hero.maxHp += 20; hero.hp = hero.maxHp;
+    hero.maxMp += 10; hero.mp = hero.maxMp;
+    hero.atk += 5; hero.def += 3;
+    hero.expNext = Math.floor(hero.expNext * 1.5);
+    addLog(`👑 首领升级到 Lv.${hero.level}！`, 'good');
+    notify(`首领达到 Lv.${hero.level}！`, 'good');
+  }
+}
+
+// ==================== 年度事件 ====================
+function onNewMonth() {
+  // 每月学识产出提示
+  
+  // 敌对势力有几率发动袭击
+  const hostileFactions = FACTIONS.filter(f => f.rel === 'hostile');
+  for (const f of hostileFactions) {
+    if (Math.random() < 0.15) { // 15%几率每月袭击
+      spawnRaid(f);
+      break; // 每月最多一个势力袭击
+    }
+  }
+}
+
+function onNewYear() {
+  addLog(`📅 第 ${year} 年到来。`);
+
+  let fc = 0;
+  for (let y = 0; y < MH; y++)
+    for (let x = 0; x < MW; x++)
+      if (map[y][x] === T.FARM) fc++;
+  if (fc > 0) {
+    let harvest = Math.floor(fc * 2.5);
+    if (techState.agriculture?.researched) harvest = Math.floor(harvest * 1.2);
+    resources.food += harvest;
+    addLog(`🌾 农田收获 ${harvest} 粮食。`, 'good');
+  }
+
+  const cons = people.length * 4;
+  resources.food -= cons;
+
+  if (people.length > 0) {
+    const avg = people.reduce((s,p) => s + p.happiness, 0) / people.length;
+    resources.mood = Math.round(avg);
+  }
+
+  if (resources.food > people.length * 15 && resources.mood > 50 && Math.random() < 0.5) {
+    const nc = Math.min(3, 1 + Math.floor(Math.random()*2));
+    for (let i = 0; i < nc; i++) if (people.length < 300) spawnNewPerson();
+    addLog(`👶 ${nc} 名新族人加入！`, 'good');
+    notify(`${nc}名新族人加入！`, 'good');
+  }
+
+  if (resources.food < 0) {
+    resources.food = 0;
+    addLog('⚠️ 粮食不足！族人正在挨饿...', 'warn');
+    notify('粮食不足！', 'combat');
+    for (const p of people) { p.hp -= 10; p.happiness -= 15; }
+  }
+
+  if (year > 2) triggerRandomEvent();
+  if (year % 3 === 0 && Math.random() < 0.5) {
+    addLog('🏛️ 华夏部落的影响力提升了！', 'good');
+    resources.influence += 30;
+  }
+}
+
+function triggerRandomEvent() {
+  const r = Math.random();
+  if (r < 0.12) {
+    addLog('🌈 风调雨顺，今年收成格外好！', 'good');
+    resources.food += 50; resources.mood = Math.min(100, resources.mood + 5);
+    notify('风调雨顺！', 'good');
+  } else if (r < 0.22) {
+    addLog('☀️ 遭遇旱灾，粮食减产。', 'warn');
+    resources.food = Math.max(0, resources.food - 40);
+    resources.mood = Math.max(0, resources.mood - 8);
+    notify('遭遇旱灾！', 'combat');
+  } else if (r < 0.28) {
+    addLog('🐺 一群野狼袭击了部落！', 'combat');
+    notify('野狼来袭！', 'combat');
+    spawnWolfRaid();
+  } else if (r < 0.35) {
+    addLog('🎁 远方旅人来访，带来新奇物品。', 'good');
+    resources.money += 8; resources.bronze += 2;
+  } else if (r < 0.40) {
+    addLog('⛏️ 族人在山中发现了矿脉！', 'good');
+    resources.stone += 25;
+  } else if (r < 0.43 && year > 5) {
+    addLog('👻 夜里有人声称看到了山中的精怪...', 'myth');
+    notify('神秘事件...', 'myth');
+    maybeSpawnMythical();
+  }
+}
+
+function spawnWolfRaid() {
+  const cx = MW/2, cy = MH/2;
+  for (let i = 0; i < 3; i++) {
+    const ang = Math.random()*Math.PI*2;
+    const mt = MONSTER_TYPES.wolf;
+    monsters.push({
+      id: 'raid_'+Date.now()+'_'+i,
+      type:'wolf', name:'野狼', icon:'🐺',
+      hp: mt.hp, maxHp: mt.hp, atk: mt.atk, def: mt.def,
+      exp: mt.exp, level: mt.level, color: mt.color,
+      x: cx + Math.cos(ang)*22, y: cy + Math.sin(ang)*22,
+      targetX: cx, targetY: cy, state: 'chasing',
+      attackCooldown: 0, fleeing: false, roamTimer: 0
+    });
+  }
+}
+
+function maybeSpawnMythical() {
+  if (Math.random() < 0.15) {
+    const cx = MW/2, cy = MH/2;
+    const ang = Math.random()*Math.PI*2;
+    const mt = MONSTER_TYPES.sprite;
+    monsters.push({
+      id: 'myth_'+Date.now(),
+      type:'sprite', name:'山精', icon:'👹',
+      hp: mt.hp, maxHp: mt.hp, atk: mt.atk, def: mt.def,
+      exp: mt.exp, level: mt.level, color: mt.color, mythical: true,
+      x: cx + Math.cos(ang)*28, y: cy + Math.sin(ang)*28,
+      targetX: cx + Math.cos(ang)*20, targetY: cy + Math.sin(ang)*20,
+      state: 'roaming', attackCooldown: 0, fleeing: false, roamTimer: 0
+    });
+    addLog('🌟 山精现身了！只存在于传说中的生物...', 'myth');
+    notify('山精现身！', 'myth');
+  }
+}
+
+// ==================== 渲染 ====================
+function render() {
+  ctx.fillStyle = '#0a1018';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
+  ctx.scale(camera.zoom, camera.zoom);
+
+  const sx = Math.max(0, Math.floor(camera.x/TS) - 1);
+  const sy = Math.max(0, Math.floor(camera.y/TS) - 1);
+  const ex = Math.min(MW, Math.ceil((camera.x+canvas.width)/TS) + 1);
+  const ey = Math.min(MH, Math.ceil((camera.y+canvas.height)/TS) + 1);
+
+  // 绘制势力范围光晕
+  drawInfluenceZone();
+  
+  // 绘制领地边界
+  drawTerritoryBorder(sx, sy, ex, ey);
+
+  // 地图
+  for (let y = sy; y < ey; y++)
+    for (let x = sx; x < ex; x++)
+      drawTile(x, y, map[y][x], mapVar[y][x]);
+
+  // 工作标记
+  for (const j of jobs) {
+    if (j.done || j.x<sx-1||j.x>ex+1||j.y<sy-1||j.y>ey+1) continue;
+    drawJobMark(j);
+  }
+
+  // 怪物
+  for (const m of monsters) {
+    if (m.x<sx-2||m.x>ex+2||m.y<sy-2||m.y>ey+2) continue;
+    drawMonster(m);
+  }
+
+  // 族人
+  for (const p of people) {
+    if (p.x<sx-2||p.x>ex+2||p.y<sy-2||p.y>ey+2) continue;
+    drawPerson(p);
+  }
+
+  // 选择框
+  if (isDragging && dragStart) drawSelection();
+
+  // 战斗特效
+  drawCombatEffects();
+
+  ctx.restore();
+  
+  // 天气效果（屏幕级）
+  drawWeatherEffects();
+  
+  // 三国志风格鼠标提示
+  drawMouseTooltip();
+
+  // 时代光效
+  const eraColors = ['#f39c12', '#cd7f32', '#95a5a6', '#d4541e'];
+  const grad = ctx.createLinearGradient(0,0,canvas.width,0);
+  grad.addColorStop(0,'transparent');
+  grad.addColorStop(0.5, eraColors[currentEra] + '20');
+  grad.addColorStop(1,'transparent');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, 3);
+}
+
+function drawInfluenceZone() {
+  const cx = MW/2 * TS;
+  const cy = MH/2 * TS;
+  const radius = Math.min(300, 50 + resources.influence * 0.5);
+  const g = ctx.createRadialGradient(cx, cy, radius*0.3, cx, cy, radius);
+  g.addColorStop(0, 'rgba(243,156,18,0.08)');
+  g.addColorStop(0.5, 'rgba(243,156,18,0.04)');
+  g.addColorStop(1, 'rgba(243,156,18,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(cx - radius, cy - radius, radius*2, radius*2);
+}
+
+// 绘制领地边界
+function drawTerritoryBorder(sx, sy, ex, ey) {
+  const cx = MW/2, cy = MH/2;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(74,158,255,0.6)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  
+  // 绘制圆形边界
+  ctx.beginPath();
+  ctx.arc(cx*TS + TS/2, cy*TS + TS/2, territoryRadius*TS, 0, Math.PI*2);
+  ctx.stroke();
+  
+  // 领地内的方格高亮
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(74,158,255,0.03)';
+  for (let y = sy; y < ey; y++) {
+    for (let x = sx; x < ex; x++) {
+      const d = dist(x, y, cx, cy);
+      if (d <= territoryRadius && d > territoryRadius - 0.5) {
+        ctx.fillStyle = 'rgba(74,158,255,0.08)';
+        ctx.fillRect(x*TS, y*TS, TS, TS);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+// 天气粒子
+let weatherParticles = [];
+
+// 绘制天气效果
+function drawWeatherEffects() {
+  const w = canvas.width, h = canvas.height;
+  
+  // 天气色调覆盖
+  const tints = {
+    sunny:  'rgba(255,230,100,0.05)',
+    cloudy: 'rgba(150,150,170,0.1)',
+    rainy:  'rgba(100,120,180,0.12)',
+    storm:  'rgba(50,70,120,0.2)',
+    hot:    'rgba(255,100,50,0.08)',
+    snowy:  'rgba(220,230,255,0.15)'
+  };
+  if (tints[weather.type]) {
+    ctx.fillStyle = tints[weather.type];
+    ctx.fillRect(0, 0, w, h);
+  }
+  
+  // 雨天粒子
+  if (weather.type === 'rainy' || weather.type === 'storm') {
+    const count = weather.type === 'storm' ? 150 : 80;
+    ctx.strokeStyle = weather.type === 'storm' ? 'rgba(150,180,255,0.6)' : 'rgba(180,200,255,0.4)';
+    ctx.lineWidth = 1;
+    const speed = weather.type === 'storm' ? 15 : 10;
+    for (let i = 0; i < count; i++) {
+      const x = (i * 37 + gameTime * 200) % (w + 100) - 50;
+      const y = (i * 53 + gameTime * speed * 60) % (h + 50) - 25;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - 5, y + 15);
+      ctx.stroke();
+    }
+  }
+  
+  // 雪天粒子
+  if (weather.type === 'snowy') {
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    for (let i = 0; i < 100; i++) {
+      const x = (i * 47 + gameTime * 30) % (w + 50) - 25;
+      const y = (i * 61 + gameTime * 40) % (h + 50) - 25;
+      const size = 1 + (i % 3) * 0.8;
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+  
+  // 酷暑热浪
+  if (weather.type === 'hot') {
+    ctx.fillStyle = 'rgba(255,150,50,0.03)';
+    for (let i = 0; i < 5; i++) {
+      const y = (i * 80 + gameTime * 20) % h;
+      ctx.fillRect(0, y, w, 30);
+    }
+  }
+}
+
+// 三国志风格鼠标提示
+function drawMouseTooltip() {
+  if (!gameStarted || !canvas) return;
+  
+  const tx = Math.floor((lastMX + camera.x) / TS / camera.zoom);
+  const ty = Math.floor((lastMY + camera.y) / TS / camera.zoom);
+  
+  if (tx < 0 || tx >= MW || ty < 0 || ty >= MH) return;
+  
+  const tile = map[ty][tx];
+  const inTerritory = isInTerritory(tx, ty);
+  
+  // 获取地形名称
+  const tileNames = {
+    [T.GRASS]: '草地', [T.DIRT]: '泥土', [T.SAND]: '沙地',
+    [T.WATER]: '水域', [T.TREE]: '森林', [T.STONE]: '石矿',
+    [T.MOUNTAIN]: '山脉', [T.IRON]: '铁矿', [T.COPPER]: '铜矿',
+    [T.GOLD]: '金矿', [T.ROAD]: '道路', [T.FLOOR]: '地板',
+    [T.HOUSE]: '房屋', [T.FARM]: '农田', [T.WORKSHOP]: '作坊',
+    [T.STORAGE]: '仓廪', [T.WELL]: '水井', [T.ALTAR]: '祭坛',
+    [T.WALL]: '围墙', [T.WATCHTOWER]: '哨塔', [T.FARM_HUT]: '农舍',
+    [T.SCHOOL]: '学堂', [T.LIBRARY]: '藏书阁', [T.BARRACKS]: '兵营',
+    [T.ARCHERY]: '演武场', [T.BRONZE_FORGE]: '青铜坊'
+  };
+  
+  const tileName = tileNames[tile] || '未知';
+  
+  // 绘制提示框
+  const padding = 10;
+  const lineH = 18;
+  const lines = [
+    `坐标: (${tx}, ${ty})`,
+    `地形: ${tileName}`,
+    `领地: ${inTerritory ? '✓ 境内' : '✗ 境外'}`,
+    `天气: ${WEATHER_TYPES[weather.type].icon} ${WEATHER_TYPES[weather.type].name}`
+  ];
+  
+  // 检查是否有人物或怪物
+  let hoverPerson = null, hoverMonster = null;
+  for (const p of people) {
+    if (Math.abs(p.x - tx) < 1 && Math.abs(p.y - ty) < 1) { hoverPerson = p; break; }
+  }
+  for (const m of monsters) {
+    if (m.hp > 0 && Math.abs(m.x - tx) < 1 && Math.abs(m.y - ty) < 1) { hoverMonster = m; break; }
+  }
+  
+  if (hoverPerson) {
+    lines.push(``, `人物: ${hoverPerson.name}`);
+    lines.push(`职业: ${hoverPerson.job}  Lv.${hoverPerson.level}`);
+    lines.push(`HP: ${Math.floor(hoverPerson.hp)}/${hoverPerson.maxHp}`);
+  }
+  if (hoverMonster) {
+    lines.push(``, `敌人: ${hoverMonster.name}  Lv.${hoverMonster.level}`);
+    lines.push(`HP: ${Math.floor(hoverMonster.hp)}/${hoverMonster.maxHp}`);
+    lines.push(`攻击: ${hoverMonster.atk}  防御: ${hoverMonster.def}`);
+  }
+  
+  let maxWidth = 100;
+  ctx.font = '12px -apple-system, "Microsoft YaHei", sans-serif';
+  for (const line of lines) {
+    maxWidth = Math.max(maxWidth, ctx.measureText(line).width + 10);
+  }
+  
+  const boxW = maxWidth + padding * 2;
+  const boxH = lines.length * lineH + padding * 2;
+  
+  let boxX = lastMX + 15;
+  let boxY = lastMY + 15;
+  if (boxX + boxW > canvas.width) boxX = lastMX - boxW - 15;
+  if (boxY + boxH > canvas.height) boxY = lastMY - boxH - 15;
+  
+  // 背景（三国志风格：深色半透明 + 金色边框）
+  ctx.fillStyle = 'rgba(10,15,25,0.92)';
+  ctx.fillRect(boxX, boxY, boxW, boxH);
+  
+  // 边框
+  ctx.strokeStyle = '#c9a227';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, boxH - 1);
+  
+  // 内边框装饰
+  ctx.strokeStyle = 'rgba(201,162,39,0.3)';
+  ctx.strokeRect(boxX + 3.5, boxY + 3.5, boxW - 7, boxH - 7);
+  
+  // 文字
+  ctx.fillStyle = '#e8e6e3';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    let color = '#e8e6e3';
+    if (line.startsWith('地形:')) color = '#6ab7ff';
+    else if (line.startsWith('领地:')) color = inTerritory ? '#2ecc71' : '#e74c3c';
+    else if (line.startsWith('天气:')) color = WEATHER_TYPES[weather.type].color;
+    else if (line.startsWith('人物:') || line.startsWith('敌人:')) color = '#f39c12';
+    else if (line.startsWith('坐标:')) color = '#7a8aa5';
+    
+    ctx.fillStyle = color;
+    ctx.fillText(line, boxX + padding, boxY + padding + i * lineH);
+  }
+  
+  ctx.textBaseline = 'alphabetic';
+}
+
+function drawTile(x, y, tile, v) {
+  const px = x*TS, py = y*TS;
+  const c = getBaseColor(tile, v);
+  ctx.fillStyle = c;
+  ctx.fillRect(px, py, TS, TS);
+
+  switch(tile) {
+    case T.TREE: drawTree(px, py, v); break;
+    case T.MOUNTAIN: drawMountain(px, py, v); break;
+    case T.WATER: drawWater(px, py, x, y); break;
+    case T.HOUSE: drawHouse(px, py, v); break;
+    case T.FARM: drawFarm(px, py, v, x, y); break;
+    case T.WORKSHOP: drawWorkshop(px, py, v); break;
+    case T.ALTAR: drawAltar(px, py); break;
+    case T.WALL: drawWall(px, py, v); break;
+    case T.WATCHTOWER: drawWatchtower(px, py); break;
+    case T.STONE: case T.IRON: case T.COPPER: case T.GOLD:
+      drawOre(px, py, tile, v); break;
+    case T.WELL: drawWell(px, py); break;
+    case T.STORAGE: drawStorage(px, py); break;
+    case T.FARM_HUT: drawFarmHut(px, py); break;
+    case T.ROAD: drawRoad(px, py); break;
+    case T.SCHOOL: drawSchool(px, py); break;
+    case T.LIBRARY: drawLibrary(px, py); break;
+    case T.BARRACKS: drawBarracks(px, py); break;
+    case T.ARCHERY: drawArchery(px, py); break;
+    case T.BRONZE_FORGE: drawBronzeForge(px, py); break;
+  }
+}
+
+function getBaseColor(tile, v) {
+  const grass = ['#3a7d44','#428a4c','#357038','#3e8548'];
+  const dirt = ['#8b7355','#806848','#947a5a','#7a6248'];
+  const sand = ['#d4b87a','#c9a868','#deb880','#c0a860'];
+  const water = ['#2a6f97','#2c7da0','#27678a','#3080a8'];
+  const stone = ['#6b7280','#71797e','#606870','#7a8288'];
+  switch(tile) {
+    case T.GRASS: return grass[v%4];
+    case T.DIRT: return dirt[v%4];
+    case T.SAND: return sand[v%4];
+    case T.WATER: return water[v%4];
+    case T.TREE: return grass[v%4];
+    case T.STONE: case T.IRON: case T.COPPER: case T.GOLD: return stone[v%4];
+    case T.MOUNTAIN: return '#5a5a5a';
+    case T.ROAD: return '#8b7355';
+    case T.FLOOR: return '#a0896c';
+    default: return grass[v%4];
+  }
+}
+
+function drawTree(px, py, v) {
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.beginPath(); ctx.ellipse(px+TS/2+2, py+TS-3, 7, 2.5, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#5d3a1a';
+  ctx.fillRect(px+TS/2-2, py+TS-11, 4, 9);
+  const cx = px+TS/2, cy = py+TS/2-1, r = TS/2-3;
+  ctx.fillStyle = '#2d5a27';
+  ctx.beginPath(); ctx.arc(cx, cy+2, r, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#3d7a35';
+  ctx.beginPath(); ctx.arc(cx, cy, r-1, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#4a9040';
+  ctx.beginPath(); ctx.arc(cx-2, cy-2, r-3, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#5da850';
+  ctx.fillRect(cx-3, cy-4, 2, 2);
+  ctx.fillRect(cx+1, cy-2, 1.5, 1.5);
+}
+
+function drawMountain(px, py, v) {
+  const g = ctx.createLinearGradient(px, py, px, py+TS);
+  g.addColorStop(0, '#6b7280'); g.addColorStop(0.3, '#5a5a5a'); g.addColorStop(1, '#4a4a4a');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(px, py+TS); ctx.lineTo(px+TS/2, py+2); ctx.lineTo(px+TS, py+TS);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#e8e8e8';
+  ctx.beginPath();
+  ctx.moveTo(px+TS/2-6, py+7); ctx.lineTo(px+TS/2, py+2);
+  ctx.lineTo(px+TS/2+6, py+7); ctx.lineTo(px+TS/2+3, py+10);
+  ctx.lineTo(px+TS/2-3, py+10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.moveTo(px+TS/2, py+2); ctx.lineTo(px+TS, py+TS);
+  ctx.lineTo(px+TS/2+1, py+TS); ctx.closePath(); ctx.fill();
+}
+
+function drawWater(px, py, tx, ty) {
+  const t = Date.now()/1000;
+  const wo = Math.sin(t*1.5 + tx*0.3 + ty*0.2)*0.5;
+  ctx.fillStyle = '#1a4a6a';
+  ctx.fillRect(px, py, TS, TS);
+  const g = ctx.createLinearGradient(px, py, px, py+TS);
+  g.addColorStop(0, 'rgba(74,158,255,0.3)');
+  g.addColorStop(0.5, 'rgba(52,152,219,0.15)');
+  g.addColorStop(1, 'rgba(26,74,106,0.5)');
+  ctx.fillStyle = g;
+  ctx.fillRect(px, py, TS, TS);
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  const wy = py + TS/2 + wo;
+  ctx.fillRect(px+2+wo, wy-1, 7, 1.5);
+  ctx.fillRect(px+13-wo, wy+4, 6, 1);
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fillRect(px+5, py+3, 3, 1);
+}
+
+function drawHouse(px, py, v) {
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(px+TS/2+2, py+TS-2, TS/2-2, 3, 0, 0, Math.PI*2); ctx.fill();
+  const g = ctx.createLinearGradient(px, py+TS/2, px, py+TS-2);
+  g.addColorStop(0, '#9b7653'); g.addColorStop(1, '#7a5a3a');
+  ctx.fillStyle = g;
+  ctx.fillRect(px+3, py+TS/2, TS-6, TS/2-3);
+  const rg = ctx.createLinearGradient(px, py+2, px, py+TS/2+2);
+  rg.addColorStop(0, '#daa520'); rg.addColorStop(0.5, '#c9a227'); rg.addColorStop(1, '#b8860b');
+  ctx.fillStyle = rg;
+  ctx.beginPath();
+  ctx.moveTo(px+1, py+TS/2+2); ctx.lineTo(px+TS/2, py+2);
+  ctx.lineTo(px+TS-1, py+TS/2+2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.beginPath();
+  ctx.moveTo(px+TS/2, py+2); ctx.lineTo(px+TS-1, py+TS/2+2);
+  ctx.lineTo(px+TS/2+1, py+TS/2+2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#3d2817';
+  ctx.fillRect(px+TS/2-3, py+TS-8, 6, 8);
+  ctx.fillStyle = '#5a3d24';
+  ctx.fillRect(px+TS/2-3, py+TS-8, 6, 1);
+  ctx.fillStyle = 'rgba(255,230,150,0.6)';
+  ctx.fillRect(px+5, py+TS/2+4, 4, 4);
+  ctx.strokeStyle = '#5a3d24'; ctx.lineWidth = 0.8;
+  ctx.strokeRect(px+5, py+TS/2+4, 4, 4);
+  if (v%2===0) {
+    ctx.fillStyle = '#8b4513';
+    ctx.fillRect(px+TS/2-1, py+1, 2, 3);
+  }
+}
+
+function drawFarm(px, py, v, tx, ty) {
+  ctx.fillStyle = '#6b5a3a';
+  ctx.fillRect(px, py, TS, TS);
+  ctx.fillStyle = '#8b7355';
+  for (let i = 0; i < 4; i++) ctx.fillRect(px, py+2+i*7, TS, 3);
+  const phase = (tx+ty+v)%3;
+  const cc = phase===0 ? '#4a7c3a' : phase===1 ? '#6ba04a' : '#c9a227';
+  ctx.fillStyle = cc;
+  for (let r=0; r<3; r++) for (let c=0; c<3; c++) {
+    const cxp = px+4+c*8, cyp = py+4+r*7;
+    ctx.fillRect(cxp, cyp, 2, 3);
+    if (phase > 0) { ctx.fillRect(cxp-1, cyp+1, 4, 1); }
+  }
+  if (phase === 2) {
+    ctx.fillStyle = 'rgba(255,215,0,0.15)';
+    ctx.fillRect(px, py, TS, TS);
+  }
+}
+
+function drawWorkshop(px, py, v) {
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(px+TS/2+2, py+TS-2, TS/2-2, 2.5, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#6b4423';
+  ctx.fillRect(px+2, py+TS/2, TS-4, TS/2-3);
+  ctx.fillStyle = '#5a3a1c';
+  ctx.fillRect(px+2, py+TS/2, TS-4, 2);
+  const rg = ctx.createLinearGradient(px, py+3, px, py+TS/2+2);
+  rg.addColorStop(0, '#a0522d'); rg.addColorStop(1, '#8b4513');
+  ctx.fillStyle = rg;
+  ctx.beginPath();
+  ctx.moveTo(px+1, py+TS/2+2); ctx.lineTo(px+TS/2, py+3);
+  ctx.lineTo(px+TS-1, py+TS/2+2); ctx.closePath(); ctx.fill();
+  const t = Date.now()/400;
+  const sr = 2 + Math.sin(t)*0.8;
+  ctx.fillStyle = '#4a3020';
+  ctx.fillRect(px+TS-7, py+4, 4, 8);
+  ctx.fillStyle = `rgba(200,200,200,${0.3+Math.sin(t)*0.2})`;
+  ctx.beginPath(); ctx.arc(px+TS-5, py+2+Math.sin(t*0.7), sr, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = `rgba(180,180,180,${0.2+Math.sin(t*1.3)*0.15})`;
+  ctx.beginPath(); ctx.arc(px+TS-6, py-1, sr-0.5, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#3d2817';
+  ctx.fillRect(px+TS/2-2, py+TS-7, 4, 7);
+}
+
+function drawAltar(px, py) {
+  const t = Date.now()/500;
+  const gr = TS*0.9 + Math.sin(t)*2;
+  const g = ctx.createRadialGradient(px+TS/2, py+TS/2, 2, px+TS/2, py+TS/2, gr);
+  g.addColorStop(0, 'rgba(243,156,18,0.25)');
+  g.addColorStop(0.5, 'rgba(243,156,18,0.1)');
+  g.addColorStop(1, 'rgba(243,156,18,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(px-TS/2, py-TS/2, TS*2, TS*2);
+  ctx.fillStyle = '#7a6444';
+  ctx.fillRect(px+3, py+TS-9, TS-6, 7);
+  ctx.fillStyle = '#8b7355';
+  ctx.fillRect(px+3, py+TS-9, TS-6, 2);
+  ctx.fillStyle = '#a07818';
+  ctx.fillRect(px+6, py+TS-15, TS-12, 7);
+  ctx.fillStyle = '#b8860b';
+  ctx.fillRect(px+6, py+TS-15, TS-12, 2);
+  ctx.fillStyle = '#c9a227';
+  ctx.fillRect(px+9, py+TS-20, TS-18, 6);
+  ctx.fillStyle = '#daa520';
+  ctx.fillRect(px+9, py+TS-20, TS-18, 2);
+  const fh = 6 + Math.sin(t*2)*1.5;
+  const fg = ctx.createRadialGradient(px+TS/2, py+TS-22, 1, px+TS/2, py+TS-22-fh, fh);
+  fg.addColorStop(0, '#fff8dc'); fg.addColorStop(0.3, '#ffd700');
+  fg.addColorStop(0.6, '#ff8c00'); fg.addColorStop(1, 'rgba(255,69,0,0)');
+  ctx.fillStyle = fg;
+  ctx.beginPath();
+  ctx.ellipse(px+TS/2, py+TS-20-fh/2, 3.5, fh, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#fffacd';
+  ctx.beginPath();
+  ctx.ellipse(px+TS/2, py+TS-21-fh/3, 1.5, fh/2, 0, 0, Math.PI*2);
+  ctx.fill();
+}
+
+function drawWall(px, py, v) {
+  const g = ctx.createLinearGradient(px, py, px, py+TS);
+  g.addColorStop(0, '#9b8b7b'); g.addColorStop(1, '#7a6a5a');
+  ctx.fillStyle = g;
+  ctx.fillRect(px, py+5, TS, TS-7);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.fillRect(px, py+TS/2, TS, 1);
+  ctx.fillRect(px+TS/2, py+5, 1, TS-7);
+  ctx.fillRect(px+TS/4, py+5, 1, TS/2-5);
+  ctx.fillRect(px+TS*3/4, py+TS/2, 1, TS/2-2);
+  ctx.fillStyle = '#ab9b8b';
+  ctx.fillRect(px, py+4, TS, 2);
+  ctx.fillStyle = '#8b7b6b';
+  for (let i=0;i<3;i++) ctx.fillRect(px+1+i*9, py, 7, 5);
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  ctx.fillRect(px+TS-3, py+5, 3, TS-7);
+}
+
+function drawWatchtower(px, py) {
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath(); ctx.ellipse(px+TS/2+2, py+TS-1, 7, 2.5, 0, 0, Math.PI*2); ctx.fill();
+  const g = ctx.createLinearGradient(px+4, py, px+TS-4, py);
+  g.addColorStop(0, '#8b7b6b'); g.addColorStop(0.5, '#9b8b7b'); g.addColorStop(1, '#7a6a5a');
+  ctx.fillStyle = g;
+  ctx.fillRect(px+6, py+TS-13, TS-12, 11);
+  ctx.fillStyle = '#a08878';
+  ctx.fillRect(px+4, py+TS-15, TS-8, 3);
+  ctx.fillStyle = '#8b4513';
+  ctx.beginPath();
+  ctx.moveTo(px+2, py+TS-14); ctx.lineTo(px+TS/2, py+2);
+  ctx.lineTo(px+TS-2, py+TS-14); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#a0522d';
+  ctx.beginPath();
+  ctx.moveTo(px+2, py+TS-14); ctx.lineTo(px+TS/2, py+2);
+  ctx.lineTo(px+TS/2+1, py+TS-14); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(px+TS/2-1.5, py+TS-10, 3, 4);
+  ctx.fillStyle = 'rgba(255,200,100,0.4)';
+  ctx.fillRect(px+TS/2-1, py+TS-9, 2, 2);
+  ctx.fillStyle = '#c9a227';
+  ctx.fillRect(px+TS/2-1, py, 2, 3);
+}
+
+function drawOre(px, py, tile, v) {
+  ctx.fillStyle = '#6b7280';
+  ctx.beginPath();
+  ctx.moveTo(px+2, py+TS-3);
+  ctx.lineTo(px+5, py+5);
+  ctx.lineTo(px+TS-4, py+3);
+  ctx.lineTo(px+TS-2, py+TS-2);
+  ctx.closePath(); ctx.fill();
+  let oc = '#cd7f32';
+  if (tile === T.COPPER) oc = '#cd7f32';
+  if (tile === T.GOLD) oc = '#ffd700';
+  if (tile === T.IRON) oc = '#8b4513';
+  if (tile === T.GOLD) {
+    const t = Date.now()/600;
+    const g = ctx.createRadialGradient(px+TS/2, py+TS/2, 1, px+TS/2, py+TS/2, 10);
+    g.addColorStop(0, 'rgba(255,215,0,0.4)'); g.addColorStop(1, 'rgba(255,215,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(px, py, TS, TS);
+  }
+  ctx.fillStyle = oc;
+  ctx.fillRect(px+5, py+7, 5, 5);
+  ctx.fillRect(px+13, py+12, 4, 4);
+  ctx.fillRect(px+7, py+17, 3, 3);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillRect(px+6, py+8, 2, 2);
+  ctx.fillRect(px+14, py+13, 1.5, 1.5);
+}
+
+function drawWell(px, py) {
+  ctx.fillStyle = '#7a6a5a';
+  ctx.beginPath(); ctx.ellipse(px+TS/2, py+TS-4, TS/2-3, 4, 0, 0, Math.PI*2); ctx.fill();
+  const g = ctx.createRadialGradient(px+TS/2, py+TS/2+2, 1, px+TS/2, py+TS/2+2, TS/2-4);
+  g.addColorStop(0, '#1a2a3a'); g.addColorStop(0.7, '#2a4a6a'); g.addColorStop(1, '#3a5a7a');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(px+TS/2, py+TS/2+2, TS/2-5, TS/2-6, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(px+TS/2-3, py+TS/2, 4, 1.5, -0.3, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#6b4423';
+  ctx.fillRect(px+3, py+2, 2, 10);
+  ctx.fillRect(px+TS-5, py+2, 2, 10);
+  ctx.fillRect(px+2, py, TS-4, 3);
+  ctx.fillStyle = '#8b4513';
+  ctx.beginPath();
+  ctx.moveTo(px+1, py+2); ctx.lineTo(px+TS/2, py-4);
+  ctx.lineTo(px+TS-1, py+2); ctx.closePath(); ctx.fill();
+}
+
+function drawStorage(px, py) {
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(px+TS/2+2, py+TS-2, TS/2-3, 2.5, 0, 0, Math.PI*2); ctx.fill();
+  const cx = px+TS/2, cy = py+TS/2+3;
+  const rx = TS/2-4, ry = TS/2-5;
+  const g = ctx.createLinearGradient(px+3, cy, px+TS-3, cy);
+  g.addColorStop(0, '#8b4513'); g.addColorStop(0.3, '#a0522d');
+  g.addColorStop(0.7, '#8b4513'); g.addColorStop(1, '#6b3410');
+  ctx.fillStyle = g;
+  ctx.fillRect(px+4, cy-ry+2, TS-8, ry*2-2);
+  ctx.fillStyle = '#daa520';
+  ctx.beginPath();
+  ctx.moveTo(px+3, cy-ry+3); ctx.lineTo(cx, py+2);
+  ctx.lineTo(px+TS-3, cy-ry+3); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#3d2817';
+  ctx.fillRect(cx-3, py+TS-9, 6, 8);
+  ctx.fillStyle = '#c9a227';
+  ctx.fillRect(cx-0.5, py+TS-6, 1, 2);
+}
+
+function drawFarmHut(px, py) {
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.beginPath(); ctx.ellipse(px+TS/2+1, py+TS-2, TS/2-3, 2, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#8b6914';
+  ctx.fillRect(px+4, py+TS/2+1, TS-8, TS/2-4);
+  ctx.fillStyle = '#c9a227';
+  ctx.beginPath();
+  ctx.moveTo(px+2, py+TS/2+2); ctx.lineTo(px+TS/2, py+4);
+  ctx.lineTo(px+TS-2, py+TS/2+2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#3d2817';
+  ctx.fillRect(px+TS/2-2, py+TS-6, 4, 6);
+}
+
+function drawRoad(px, py) {
+  ctx.fillStyle = '#8b7355';
+  ctx.fillRect(px, py, TS, TS);
+  ctx.fillStyle = '#7a6248';
+  ctx.fillRect(px, py+2, TS, 1);
+  ctx.fillRect(px, py+TS-3, TS, 1);
+  ctx.fillStyle = 'rgba(0,0,0,0.05)';
+  ctx.fillRect(px+5, py+8, 4, 2);
+  ctx.fillRect(px+15, py+15, 5, 2);
+}
+
+function drawSchool(px, py) {
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(px+TS/2+2, py+TS-2, TS/2-1, 2.5, 0, 0, Math.PI*2); ctx.fill();
+  const g = ctx.createLinearGradient(px, py+TS/2, px, py+TS);
+  g.addColorStop(0, '#9b8b7b'); g.addColorStop(1, '#7a6a5a');
+  ctx.fillStyle = g;
+  ctx.fillRect(px+2, py+TS/2-2, TS-4, TS/2-1);
+  ctx.fillStyle = '#8b4513';
+  ctx.beginPath();
+  ctx.moveTo(px+1, py+TS/2-1); ctx.lineTo(px+TS/2, py+2);
+  ctx.lineTo(px+TS-1, py+TS/2-1); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#5a3d24';
+  ctx.fillRect(px+TS/2-2, py+TS-7, 4, 7);
+  ctx.fillStyle = '#f5deb3';
+  ctx.fillRect(px+5, py+TS/2+2, 3, 4);
+  ctx.fillRect(px+TS-8, py+TS/2+2, 3, 4);
+  ctx.fillStyle = '#c9a227';
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('学', px+TS/2, py+9);
+  ctx.textAlign = 'left';
+}
+
+function drawLibrary(px, py) {
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(px+TS/2+2, py+TS-2, TS/2-1, 2.5, 0, 0, Math.PI*2); ctx.fill();
+  const g = ctx.createLinearGradient(px, py+5, px, py+TS);
+  g.addColorStop(0, '#8b7355'); g.addColorStop(1, '#6b5a4a');
+  ctx.fillStyle = g;
+  ctx.fillRect(px+2, py+5, TS-4, TS-7);
+  ctx.fillStyle = '#7a6959';
+  ctx.fillRect(px+2, py+TS/2, TS-4, 2);
+  ctx.fillStyle = '#a0522d';
+  ctx.beginPath();
+  ctx.moveTo(px+1, py+6); ctx.lineTo(px+TS/2, py+1);
+  ctx.lineTo(px+TS-1, py+6); ctx.closePath(); ctx.fill();
+  for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = i%2 ? '#2d7dd2' : '#c9a227';
+    ctx.fillRect(px+4+i*5, py+9, 3, 5);
+    ctx.fillRect(px+4+i*5, py+TS/2+3, 3, 5);
+  }
+}
+
+function drawBarracks(px, py) {
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(px+TS/2+2, py+TS-2, TS/2-1, 2.5, 0, 0, Math.PI*2); ctx.fill();
+  const g = ctx.createLinearGradient(px, py+TS/2, px, py+TS);
+  g.addColorStop(0, '#7a5a3a'); g.addColorStop(1, '#5a3a2a');
+  ctx.fillStyle = g;
+  ctx.fillRect(px+2, py+TS/2-2, TS-4, TS/2-1);
+  ctx.fillStyle = '#8b4513';
+  ctx.beginPath();
+  ctx.moveTo(px, py+TS/2-1); ctx.lineTo(px+TS/2, py+3);
+  ctx.lineTo(px+TS, py+TS/2-1); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#3d2817';
+  ctx.fillRect(px+TS/2-3, py+TS-8, 6, 8);
+  // 旗帜
+  ctx.fillStyle = '#5a3d24';
+  ctx.fillRect(px+TS/2-0.5, py-2, 1, 6);
+  ctx.fillStyle = '#c0392b';
+  ctx.beginPath();
+  ctx.moveTo(px+TS/2, py-2);
+  ctx.lineTo(px+TS/2+6, py);
+  ctx.lineTo(px+TS/2, py+2);
+  ctx.closePath(); ctx.fill();
+}
+
+function drawArchery(px, py) {
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.beginPath(); ctx.ellipse(px+TS/2, py+TS-2, TS/2, 3, 0, 0, Math.PI*2); ctx.fill();
+  // 靶子
+  ctx.fillStyle = '#8b6914';
+  ctx.fillRect(px+TS/2-1, py+TS-10, 2, 10);
+  for (let i = 4; i > 0; i--) {
+    ctx.fillStyle = i%2 ? '#e74c3c' : '#f5f5f5';
+    ctx.beginPath();
+    ctx.arc(px+TS/2, py+TS-11, i*1.5, 0, Math.PI*2);
+    ctx.fill();
+  }
+  // 围栏
+  ctx.fillStyle = '#8b4513';
+  ctx.fillRect(px+2, py+TS-5, TS-4, 3);
+  ctx.fillRect(px+4, py+TS-7, 2, 5);
+  ctx.fillRect(px+TS-6, py+TS-7, 2, 5);
+}
+
+function drawBronzeForge(px, py) {
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(px+TS/2, py+TS-2, TS/2-1, 3, 0, 0, Math.PI*2); ctx.fill();
+  // 熔炉基座
+  ctx.fillStyle = '#5a5a5a';
+  ctx.fillRect(px+3, py+TS-12, TS-6, 10);
+  ctx.fillStyle = '#7a7a7a';
+  ctx.fillRect(px+3, py+TS-12, TS-6, 2);
+  // 炉口
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(px+TS/2-4, py+TS-9, 8, 5);
+  // 火焰
+  ctx.fillStyle = '#e74c3c';
+  ctx.beginPath();
+  ctx.moveTo(px+TS/2-3, py+TS-5);
+  ctx.lineTo(px+TS/2, py+TS-10);
+  ctx.lineTo(px+TS/2+3, py+TS-5);
+  ctx.fill();
+  ctx.fillStyle = '#f39c12';
+  ctx.beginPath();
+  ctx.moveTo(px+TS/2-2, py+TS-5);
+  ctx.lineTo(px+TS/2, py+TS-8);
+  ctx.lineTo(px+TS/2+2, py+TS-5);
+  ctx.fill();
+  // 烟囱
+  ctx.fillStyle = '#4a4a4a';
+  ctx.fillRect(px+TS-7, py+2, 4, 8);
+  // 烟
+  ctx.fillStyle = 'rgba(150,150,150,0.5)';
+  ctx.beginPath();
+  ctx.arc(px+TS-5, py+1, 2, 0, Math.PI*2);
+  ctx.fill();
+}
+
+function drawJobMark(j) {
+  const px = j.x*TS, py = j.y*TS;
+  const col = j.assigned ? '#f39c12' : '#e74c3c';
+  ctx.strokeStyle = col; ctx.lineWidth = 2;
+  ctx.setLineDash([4,3]);
+  ctx.strokeRect(px+2, py+2, TS-4, TS-4);
+  ctx.setLineDash([]);
+  ctx.font = '14px sans-serif';
+  ctx.fillStyle = col;
+  const ic = j.type === 'chop' ? '🪓' : j.type === 'mine' ? '⛏️' : '🎯';
+  ctx.fillText(ic, px+5, py+18);
+}
+
+function drawPerson(p) {
+  const px = p.x*TS + TS/2;
+  const py = p.y*TS + TS/2;
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(px, py+9, 6, 2, 0, 0, Math.PI*2);
+  ctx.fill();
+  const bob = p.state === 'moving' ? Math.sin(p.walkPhase) * 1 : 0;
+  ctx.fillStyle = p.color;
+  ctx.fillRect(px-4, py-1+bob, 8, 9);
+  ctx.fillStyle = '#c9a227';
+  ctx.fillRect(px-4, py+2+bob, 8, 1.5);
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx.fillRect(px-3, py-1+bob, 6, 2);
+  const armSw = p.state === 'moving' ? Math.sin(p.walkPhase)*2 : 0;
+  ctx.fillStyle = p.color;
+  ctx.fillRect(px-6, py+armSw+bob, 2, 5);
+  ctx.fillRect(px+4, py-armSw+bob, 2, 5);
+  ctx.fillStyle = '#f5deb3';
+  ctx.beginPath();
+  ctx.arc(px, py-5+bob, 4, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#2c1810';
+  ctx.fillRect(px-4, py-8+bob, 8, 3);
+  ctx.fillRect(px-2, py-12+bob, 4, 5);
+  ctx.fillStyle = '#c9a227';
+  ctx.fillRect(px-2.5, py-10+bob, 5, 1);
+  ctx.fillStyle = '#2c1810';
+  ctx.fillRect(px-2, py-5+bob, 1, 1);
+  ctx.fillRect(px+1, py-5+bob, 1, 1);
+  if (p.level >= 5) {
+    ctx.fillStyle = '#f39c12';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText('★', px+3, py-10+bob);
+  }
+  if (p.hp < p.maxHp) {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(px-7, py-14+bob, 14, 2.5);
+    const r = p.hp/p.maxHp;
+    ctx.fillStyle = r > 0.5 ? '#27ae60' : r > 0.25 ? '#f39c12' : '#e74c3c';
+    ctx.fillRect(px-7, py-14+bob, 14*r, 2.5);
+  }
+  if (p.state === 'working' && p.task) {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(px-8, py-17+bob, 16, 3);
+    ctx.fillStyle = '#3498db';
+    ctx.fillRect(px-8, py-17+bob, 16*(p.workProgress/100), 3);
+  }
+}
+
+function drawMonster(m) {
+  const px = m.x*TS + TS/2;
+  const py = m.y*TS + TS/2;
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(px, py+10, 8, 2.5, 0, 0, Math.PI*2);
+  ctx.fill();
+  if (m.mythical) {
+    const t = Date.now()/400;
+    ctx.strokeStyle = `rgba(155,89,182,${0.4+Math.sin(t)*0.2})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(px, py, 14+Math.sin(t*1.5)*2, 0, Math.PI*2);
+    ctx.stroke();
+  }
+  ctx.font = '20px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(m.icon, px, py);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(px-10, py-15, 20, 3.5);
+  const r = m.hp/m.maxHp;
+  ctx.fillStyle = m.fleeing ? '#9b59b6' : '#e74c3c';
+  ctx.fillRect(px-10, py-15, 20*r, 3.5);
+  if (m.level >= 5) {
+    ctx.font = 'bold 9px sans-serif';
+    ctx.fillStyle = m.mythical ? '#9b59b6' : '#f39c12';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Lv.${m.level}`, px, py-18);
+    ctx.textAlign = 'left';
+  }
+}
+
+function drawSelection() {
+  const mx = (lastMX+camera.x)/camera.zoom;
+  const my = (lastMY+camera.y)/camera.zoom;
+  const sx = Math.floor(dragStart.x/TS);
+  const sy = Math.floor(dragStart.y/TS);
+  const ex = Math.floor(mx/TS);
+  const ey = Math.floor(my/TS);
+  const minx = Math.min(sx,ex), maxx = Math.max(sx,ex);
+  const miny = Math.min(sy,ey), maxy = Math.max(sy,ey);
+  const color = getToolColor();
+  ctx.fillStyle = color + '15';
+  ctx.fillRect(minx*TS, miny*TS, (maxx-minx+1)*TS, (maxy-miny+1)*TS);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6,4]);
+  ctx.strokeRect(minx*TS-1, miny*TS-1, (maxx-minx+1)*TS+2, (maxy-miny+1)*TS+2);
+  ctx.setLineDash([]);
+  const count = (maxx-minx+1)*(maxy-miny+1);
+  ctx.font = 'bold 12px sans-serif';
+  ctx.fillStyle = color;
+  ctx.fillText(`${count}格`, minx*TS+4, miny*TS-4);
+}
+
+function getToolColor() {
+  switch(currentTool) {
+    case 'build': return '#4a9eff';
+    case 'farm': return '#27ae60';
+    case 'chop': return '#e67e22';
+    case 'mine': return '#95a5a6';
+    case 'road': return '#8b7355';
+    case 'attack': return '#e74c3c';
+    default: return '#f39c12';
+  }
+}
+
+// ==================== 输入 ====================
+function onMouseDown(e) {
+  if (!gameStarted) return;
+  const r = canvas.getBoundingClientRect();
+  const mx = e.clientX - r.left;
+  const my = e.clientY - r.top;
+  lastMX = mx; lastMY = my;
+  const wx = (mx+camera.x)/camera.zoom;
+  const wy = (my+camera.y)/camera.zoom;
+  const tx = Math.floor(wx/TS);
+  const ty = Math.floor(wy/TS);
+
+  if (e.button === 0) {
+    if (attackMode) {
+      attackAt(tx, ty);
+      return;
+    }
+    if (currentTool === 'inspect') {
+      for (const p of people) {
+        const d = dist(p.x*TS+TS/2, p.y*TS+TS/2, wx, wy);
+        if (d < 16) {
+          selectedPerson = p.id;
+          updatePeopleList();
+          addLog(`👤 ${p.name} - ${p.job} Lv.${p.level} | HP:${Math.floor(p.hp)}/${p.maxHp}`);
+          return;
+        }
+      }
+      for (const m of monsters) {
+        const d = dist(m.x*TS+TS/2, m.y*TS+TS/2, wx, wy);
+        if (d < 18) {
+          addLog(`👹 ${m.name} Lv.${m.level} | HP:${Math.floor(m.hp)}/${m.maxHp} | ATK:${m.atk}`, 'combat');
+          return;
+        }
+      }
+    } else {
+      isDragging = true;
+      dragStart = { x: wx, y: wy };
+    }
+  } else if (e.button === 2) {
+    attackMode = false;
+    document.getElementById('mode-indicator').classList.remove('active');
+    setTool('inspect');
+  }
+}
+
+function onMouseMove(e) {
+  const r = canvas.getBoundingClientRect();
+  lastMX = e.clientX - r.left;
+  lastMY = e.clientY - r.top;
+}
+
+function onMouseUp(e) {
+  if (!isDragging || !dragStart) { isDragging = false; return; }
+  const r = canvas.getBoundingClientRect();
+  const mx = e.clientX - r.left;
+  const my = e.clientY - r.top;
+  const wx1 = dragStart.x, wy1 = dragStart.y;
+  const wx2 = (mx+camera.x)/camera.zoom;
+  const wy2 = (my+camera.y)/camera.zoom;
+  const sx = Math.min(Math.floor(wx1/TS), Math.floor(wx2/TS));
+  const ex = Math.max(Math.floor(wx1/TS), Math.floor(wx2/TS));
+  const sy = Math.min(Math.floor(wy1/TS), Math.floor(wy2/TS));
+  const ey = Math.max(Math.floor(wy1/TS), Math.floor(wy2/TS));
+  let cnt = 0;
+  for (let y = sy; y <= ey; y++)
+    for (let x = sx; x <= ex; x++) {
+      if (x<0||x>=MW||y<0||y>=MH) continue;
+      if (applyTool(x,y)) cnt++;
+    }
+  if (cnt > 0) updateUI();
+  isDragging = false;
+  dragStart = null;
+}
+
+function applyTool(x, y) {
+  switch(currentTool) {
+    case 'build': return doBuild(x, y, selectedBuild);
+    case 'farm': return doFarm(x, y);
+    case 'chop':
+      if (map[y][x] === T.TREE) { addJob('chop', x, y); return true; }
+      return false;
+    case 'mine':
+      const t = map[y][x];
+      if (t===T.STONE||t===T.MOUNTAIN||t===T.IRON||t===T.COPPER||t===T.GOLD) {
+        addJob('mine', x, y); return true;
+      }
+      return false;
+    case 'road':
+      const tt = map[y][x];
+      if (tt===T.GRASS||tt===T.DIRT) { map[y][x] = T.ROAD; return true; }
+      return false;
+  }
+  return false;
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  const f = e.deltaY > 0 ? 0.9 : 1.1;
+  camera.zoom = Math.max(0.6, Math.min(2.5, camera.zoom * f));
+}
+
+function onKeyDown(e) {
+  if (!gameStarted) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); nextTutorial(); }
+    return;
+  }
+  const sp = 40 / camera.zoom;
+  switch(e.key.toLowerCase()) {
+    case 'w': case 'arrowup': camera.y -= sp; break;
+    case 's': case 'arrowdown': camera.y += sp; break;
+    case 'a': case 'arrowleft': camera.x -= sp; break;
+    case 'd': case 'arrowright': camera.x += sp; break;
+    case '1': setTool('build'); break;
+    case '2': setTool('farm'); break;
+    case '3': setTool('chop'); break;
+    case '4': setTool('mine'); break;
+    case '5': setTool('road'); break;
+    case '6': startAttackMode(); break;
+    case '7': setTool('inspect'); break;
+    case ' ': e.preventDefault(); setSpeed(gameSpeed === 0 ? 1 : 0); break;
+    case 'tab': e.preventDefault(); cycleTab(); break;
+    case 'escape':
+      attackMode = false;
+      document.getElementById('mode-indicator').classList.remove('active');
+      setTool('inspect');
+      break;
+  }
+}
+
+// ==================== UI操作 ====================
+function setTool(tool) {
+  currentTool = tool;
+  attackMode = (tool === 'attack');
+  document.getElementById('mode-indicator').classList.toggle('active', attackMode);
+  const tools = ['build','farm','chop','mine','road','attack','inspect'];
+  for (const t of tools) {
+    const el = document.getElementById('tool-'+t);
+    if (el) el.classList.toggle('active', currentTool === t);
+  }
+}
+
+function selectBuild(type) {
+  selectedBuild = type;
+  currentTool = 'build';
+  attackMode = false;
+  document.getElementById('mode-indicator').classList.remove('active');
+  const tools = ['build','farm','chop','mine','road','attack','inspect'];
+  for (const t of tools) {
+    const el = document.getElementById('tool-'+t);
+    if (el) el.classList.toggle('active', t === 'build');
+  }
+  switchTab('build');
+}
+
+function switchTab(name) {
+  const tabs = ['build','tech','military','faction','people'];
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', tabs[i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if (name === 'tech') updateTechUI();
+  if (name === 'military') updateMilitaryUI();
+  if (name === 'people') updatePeopleList();
+}
+
+function cycleTab() {
+  const tabs = ['build','tech','military','faction','people'];
+  let current = 'build';
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    if (t.classList.contains('active')) current = tabs[i];
+  });
+  const idx = (tabs.indexOf(current) + 1) % tabs.length;
+  switchTab(tabs[idx]);
+}
+
+function setSpeed(s) {
+  gameSpeed = s;
+  for (let i = 0; i <= 3; i++) {
+    const el = document.getElementById('spd-'+i);
+    if (el) el.classList.toggle('active', i === s);
+  }
+}
+
+// ==================== 新手引导 ====================
+function nextTutorial() {
+  tutorialStep++;
+  if (tutorialStep >= TUTORIAL_STEPS.length) {
+    startGame(); return;
+  }
+  const s = TUTORIAL_STEPS[tutorialStep];
+  document.getElementById('tut-title').textContent = s.title;
+  document.getElementById('tut-text').innerHTML = s.text;
+  document.getElementById('tut-text2').innerHTML = s.text2;
+  document.getElementById('tut-btn').textContent = s.btn;
+  for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
+    document.getElementById('step-'+i).classList.toggle('active', i <= tutorialStep);
+  }
+}
+
+function skipTutorial() { startGame(); }
+
+function startGame() {
+  document.getElementById('tutorial-overlay').classList.add('hidden');
+  gameStarted = true;
+  setSpeed(1);
+  addLog('📜 新的旅程开始了！', 'quest');
+  addLog('⛏️ 本游戏灵感来源于 Dwarf Fortress (矮人要塞)，向 Bay 12 Games 致敬！', 'quest');
+  addLog('    感谢 Tarn Adams (Toady One) 与 Zach Adams (ThreeToe) 的传奇作品。', 'quest');
+  notify('任务开始：安家落户', 'quest');
+}
+
+// ==================== UI更新 ====================
+function updateAllUI() {
+  updateResourceUI();
+  updateHeroUI();
+  updateQuestUI();
+  updatePeopleList();
+  updateTechUI();
+  updateMilitaryUI();
+  updateInfluenceUI();
+  updateFactionUI();
+  updateTerritoryUI();
+  updateWeatherUI();
+}
+
+function updateUI() {
+  updateResourceUI();
+  updateHeroUI();
+  updateQuestUI();
+  updateMilitaryUI();
+  updateInfluenceUI();
+  updateTerritoryUI();
+  updateWeatherUI();
+}
+
+function updateWeatherUI() {
+  const wt = WEATHER_TYPES[weather.type];
+  if (!wt) return;
+  const iconEl = document.getElementById('weather-icon');
+  const nameEl = document.getElementById('weather-name');
+  if (iconEl) iconEl.textContent = wt.icon;
+  if (nameEl) {
+    nameEl.textContent = wt.name;
+    nameEl.style.color = wt.color;
+  }
+  
+  // 灾害警告
+  const display = document.getElementById('weather-display');
+  if (display && disasterActive) {
+    const d = DISASTERS[disasterActive];
+    if (iconEl) iconEl.textContent = d.icon;
+    if (nameEl) {
+      nameEl.textContent = d.name + '!';
+      nameEl.style.color = '#e74c3c';
+    }
+  }
+}
+
+function updateResourceUI() {
+  document.getElementById('res-people').textContent = people.length;
+  document.getElementById('res-food').textContent = Math.floor(resources.food);
+  document.getElementById('res-wood').textContent = Math.floor(resources.wood);
+  document.getElementById('res-stone').textContent = Math.floor(resources.stone);
+  document.getElementById('res-bronze').textContent = Math.floor(resources.bronze);
+  document.getElementById('res-money').textContent = Math.floor(resources.money);
+  document.getElementById('res-knowledge').textContent = Math.floor(resources.knowledge);
+}
+
+function updateHeroUI() {
+  document.querySelector('.hero-info .name').textContent = hero.name;
+  document.querySelector('.hero-info .title').textContent = `部落首领 · Lv.${hero.level}`;
+  document.getElementById('hero-hp').textContent = `${Math.floor(hero.hp)}/${hero.maxHp}`;
+  document.getElementById('hero-mp').textContent = `${Math.floor(hero.mp)}/${hero.maxMp}`;
+  document.getElementById('hero-exp').textContent = `${Math.floor(hero.exp)}/${hero.expNext}`;
+}
+
+function updateQuestUI() {
+  const mq = MAIN_QUESTS[mainQuestIndex] || MAIN_QUESTS[MAIN_QUESTS.length-1];
+  document.getElementById('mq-name').textContent = mq.name;
+  document.getElementById('mq-desc').textContent = mq.desc;
+  let prog = 0;
+  if (questState.houseCount > 0) prog = Math.min(100, questState.houseCount * 30);
+  if (questState.farmCount > 0) prog = Math.max(prog, Math.min(100, questState.farmCount * 15));
+  document.getElementById('mq-progress').style.width = prog + '%';
+
+  for (const q of sideQuests) {
+    const el = document.getElementById(q.id + '-prog');
+    if (el) {
+      const val = questState[q.field];
+      const cur = typeof val === 'boolean' ? (val ? 1 : 0) : val;
+      el.textContent = q.completed ? '✓' : `${Math.min(cur, q.target)}/${q.target}`;
+    }
+    const item = document.querySelector(`.side-quest[data-id="${q.id}"]`);
+    if (item) item.classList.toggle('completed', q.completed);
+  }
+}
+
+function updateTechUI() {
+  document.getElementById('tech-points').textContent = Math.floor(resources.knowledge);
+  
+  // 更新时代显示
+  const eraNames = ['蛮荒时代', '青铜时代', '铁器时代', '帝国时代'];
+  const eraEl = document.querySelector('#tab-tech .military-row:last-child .val');
+  if (eraEl) eraEl.textContent = eraNames[currentEra] || '未知时代';
+
+  for (const id in TECHS) {
+    const el = document.querySelector(`.tech-item[data-tech="${id}"]`);
+    if (!el) continue;
+    const ts = techState[id] || { researched: false, progress: 0 };
+    const t = TECHS[id];
+    el.classList.toggle('researched', ts.researched);
+    el.classList.toggle('researching', currentResearch === id);
+    el.classList.toggle('locked', t.era > currentEra);
+
+    // 更新进度条
+    const progBar = el.querySelector('.t-progress-fill');
+    const costEl = el.querySelector('.t-cost');
+    if (ts.researched) {
+      if (costEl) costEl.textContent = '已掌握';
+    } else if (currentResearch === id) {
+      if (costEl) costEl.textContent = `${Math.floor(researchProgress)}/${t.cost}`;
+      if (progBar) progBar.style.width = (researchProgress / t.cost * 100) + '%';
+    } else {
+      if (costEl) costEl.textContent = `${t.cost}学识`;
+      if (progBar) progBar.style.width = '0%';
+    }
+  }
+  
+  // 更新建筑解锁状态
+  const bronzeForgeEl = document.getElementById('build-bronze_forge');
+  if (bronzeForgeEl) {
+    bronzeForgeEl.classList.toggle('locked', !techState.bronze_smelting?.researched);
+    if (techState.bronze_smelting?.researched) {
+      bronzeForgeEl.querySelector('.cost').textContent = '木30 石25';
+    }
+  }
+}
+
+function updateMilitaryUI() {
+  document.getElementById('army-total').textContent = `${military.warriors + military.archers} / ${military.maxTroops}`;
+  document.getElementById('army-warrior').textContent = military.warriors;
+  document.getElementById('army-archer').textContent = military.archers;
+  document.getElementById('army-atk').textContent = military.totalAtk;
+  document.getElementById('army-def').textContent = military.totalDef;
+}
+
+function updateInfluenceUI() {
+  const inf = Math.floor(resources.influence);
+  const maxInf = 1000;
+  const pct = Math.min(100, inf / maxInf * 100);
+  document.getElementById('influence-fill').style.width = pct + '%';
+  document.getElementById('influence-val').textContent = `${inf} / ${maxInf}`;
+  document.getElementById('faction-influence').textContent = inf;
+
+  let territory = '中心区域';
+  if (inf > 100) territory = '部落领地';
+  if (inf > 300) territory = '周边势力';
+  if (inf > 500) territory = '部落联盟';
+  if (inf > 800) territory = '雄霸一方';
+  document.getElementById('territory-val').textContent = territory;
+}
+
+function updatePeopleList() {
+  const list = document.getElementById('people-list');
+  document.getElementById('people-count').textContent = people.length + '人';
+  list.innerHTML = '';
+  const shown = people.slice(0, 10);
+  for (const p of shown) {
+    const div = document.createElement('div');
+    div.className = 'person-item' + (selectedPerson === p.id ? ' selected' : '');
+    div.innerHTML = `
+      <div class="p-head">
+        <span class="name">${p.name}</span>
+        <span class="lv">Lv.${p.level}</span>
+      </div>
+      <div style="font-size:10px;color:#7a8aa5;margin-top:2px;">${p.job} · ${p.gender}</div>
+      <div class="p-bars">
+        <div class="mini-bar"><div class="mini-bar-fill hp-fill" style="width:${p.hp/p.maxHp*100}%"></div></div>
+        <div class="mini-bar"><div class="mini-bar-fill exp-fill" style="width:${(p.exp%p.expNext)/p.expNext*100}%"></div></div>
+      </div>
+    `;
+    div.onclick = () => {
+      selectedPerson = p.id;
+      camera.x = p.x*TS - canvas.width/2;
+      camera.y = p.y*TS - canvas.height/2;
+      updatePeopleList();
+    };
+    list.appendChild(div);
+  }
+  if (people.length > 10) {
+    const more = document.createElement('div');
+    more.style.cssText = 'text-align:center;color:#5a6a80;font-size:11px;padding:6px;';
+    more.textContent = `还有 ${people.length - 10} 人...`;
+    list.appendChild(more);
+  }
+}
+
+// ==================== 工具函数 ====================
+function dist(x1, y1, x2, y2) { return Math.sqrt((x2-x1)**2 + (y2-y1)**2); }
+
+function addLog(msg, type = '') {
+  const panel = document.getElementById('log-panel');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry ' + type;
+  entry.innerHTML = `<span class="log-time">第${year}年${month}月</span>${msg}`;
+  panel.insertBefore(entry, panel.firstChild);
+  while (panel.children.length > 30) panel.removeChild(panel.lastChild);
+}
+
+function notify(msg, type = '') {
+  const cont = document.getElementById('notifications');
+  const n = document.createElement('div');
+  n.className = 'notification ' + type;
+  n.textContent = msg;
+  cont.appendChild(n);
+  setTimeout(() => n.remove(), 4000);
+}
+
+// 启动
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
