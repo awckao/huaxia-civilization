@@ -3,6 +3,19 @@ chcp 65001 >nul
 cd /d "%~dp0"
 title Huaxia Civilization Upload (awckao)
 
+REM Auto-detect Git location
+set "GIT_CMD=git"
+git --version >nul 2>&1
+if errorlevel 1 (
+    if exist "C:\Program Files\Git\bin\git.exe" (
+        set "GIT_CMD=C:\Program Files\Git\bin\git.exe"
+    ) else if exist "C:\Program Files (x86)\Git\bin\git.exe" (
+        set "GIT_CMD=C:\Program Files (x86)\Git\bin\git.exe"
+    ) else if exist "%LOCALAPPDATA%\Programs\Git\bin\git.exe" (
+        set "GIT_CMD=%LOCALAPPDATA%\Programs\Git\bin\git.exe"
+    )
+)
+
 echo.
 echo ========================================
 echo   Huaxia Civilization Rise
@@ -14,7 +27,7 @@ echo.
 
 REM Check Git
 echo [1/6] Checking Git...
-git --version >nul 2>&1
+"%GIT_CMD%" --version >nul 2>&1
 if errorlevel 1 (
     echo.
     echo [ERROR] Git not found!
@@ -27,7 +40,7 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
-for /f "tokens=3" %%v in ('git --version') do set gitver=%%v
+for /f "tokens=3" %%v in ('"%GIT_CMD%" --version') do set gitver=%%v
 echo [OK] Git version: %gitver%
 echo.
 
@@ -70,8 +83,8 @@ set /p email=Enter GitHub email (optional, press Enter to skip):
 if not "%email%"=="" (
     echo.
     echo Configuring git user...
-    git config user.name "awckao"
-    git config user.email "%email%"
+    "%GIT_CMD%" config user.name "awckao"
+    "%GIT_CMD%" config user.email "%email%"
     if errorlevel 1 (
         echo [ERROR] Failed to configure git user!
         pause
@@ -82,23 +95,23 @@ if not "%email%"=="" (
 
 echo.
 echo [Step 1/5] Initializing Git repository...
-git init
+"%GIT_CMD%" init
 if errorlevel 1 (
     echo [ERROR] git init failed!
     pause
     exit /b 1
 )
-git branch -M main >nul 2>&1
+"%GIT_CMD%" branch -M main >nul 2>&1
 echo [OK] Repository initialized (main branch)
 
 echo.
 echo [Step 2/5] Adding files...
-git add .
+"%GIT_CMD%" add .
 echo [OK] Files staged
 
 echo.
 echo [Step 3/5] Committing...
-git commit -m "Initial commit: Huaxia Civilization Rise v0.4.0"
+"%GIT_CMD%" commit -m "Initial commit: Huaxia Civilization Rise v0.4.0"
 if errorlevel 1 (
     echo [ERROR] git commit failed!
     echo.
@@ -113,10 +126,10 @@ echo [OK] Committed
 
 echo.
 echo [Step 4/5] Adding remote origin...
-git remote add origin https://github.com/awckao/huaxia-civilization.git
+"%GIT_CMD%" remote add origin https://github.com/awckao/huaxia-civilization.git
 if errorlevel 1 (
     echo [WARNING] Remote may already exist, updating...
-    git remote set-url origin https://github.com/awckao/huaxia-civilization.git
+    "%GIT_CMD%" remote set-url origin https://github.com/awckao/huaxia-civilization.git
 )
 echo [OK] Remote set: https://github.com/awckao/huaxia-civilization.git
 
@@ -132,7 +145,7 @@ echo   Select scopes: repo, workflow
 echo.
 pause
 
-git push -u origin main
+"%GIT_CMD%" push -u origin main
 if errorlevel 1 (
     echo.
     echo [ERROR] Push failed!
@@ -181,12 +194,12 @@ if "%msg%"=="" set msg=update
 
 echo.
 echo [Step 1/3] Adding files...
-git add .
+"%GIT_CMD%" add .
 echo [OK] Files staged
 
 echo.
 echo [Step 2/3] Committing...
-git commit -m "%msg%"
+"%GIT_CMD%" commit -m "%msg%"
 if errorlevel 1 (
     echo [INFO] Nothing to commit (no changes)
     echo.
@@ -197,7 +210,7 @@ echo [OK] Committed
 
 echo.
 echo [Step 3/3] Pushing...
-git push
+"%GIT_CMD%" push
 if errorlevel 1 (
     echo.
     echo [ERROR] Push failed!
